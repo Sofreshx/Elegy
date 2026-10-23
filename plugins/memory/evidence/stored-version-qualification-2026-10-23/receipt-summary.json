@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "memory-codex-assessment/v1",
+  "status": "qualified-selected-configuration",
+  "evidenceConsistent": true,
+  "selectedConfigurationQualified": true,
+  "threadCount": 84,
+  "errors": [],
+  "metrics": {
+    "pairCount": 37,
+    "meanWithRecall": 0.9099099099099099,
+    "meanWithoutRecall": 0.4009009009009009,
+    "meanPairedDelta": 0.509009009009009,
+    "completeWithRecall": 37,
+    "completeWithoutRecall": 14,
+    "meanWholeProcessMsWith": 13297.20991891892,
+    "meanWholeProcessMsWithout": 14276.610567567568
+  },
+  "cohorts": {
+    "answers-primary": {
+      "pairCount": 25,
+      "meanWithRecall": 0.9466666666666667,
+      "meanWithoutRecall": 0.4066666666666667,
+      "meanPairedDelta": 0.54,
+      "completeWithRecall": 25,
+      "completeWithoutRecall": 9,
+      "meanWholeProcessMsWith": 13200.31656,
+      "meanWholeProcessMsWithout": 14465.79672
+    },
+    "answers-transfer": {
+      "pairCount": 12,
+      "meanWithRecall": 0.8333333333333334,
+      "meanWithoutRecall": 0.3888888888888889,
+      "meanPairedDelta": 0.4444444444444445,
+      "completeWithRecall": 12,
+      "completeWithoutRecall": 5,
+      "meanWholeProcessMsWith": 13499.071083333332,
+      "meanWholeProcessMsWithout": 13882.47275
+    }
+  },
+  "failedAnswers": [],
+  "subjectSha256": "01d2d162639b7aace41503649d18e3517c5ef1ddf81fc2266f42214ed7fd1d8c",
+  "protocolSha256": "1bbd5610dce3373568f789a112024d951e86f83f9f7d4f61736304e36a6fe6be",
+  "assessorSha256": "a02fa675d11a342ce8aaf89d9ffaccb0f56a6791ede49eae41f91bae503c78d1",
+  "semanticReviewSha256": "7f70787f616e96409ca6ca8e17013b89d25703f00d86ef8658b3d123fc7c8648",
+  "limits": "Finite synthetic explicit recall on Codex CLI gpt-6.1-sol/max. Luna adverse evidence retained. No automatic Desktop hook, full settings, second software host, universal quality or monetary saving claim.",
+  "reviewMethod": "Two independent42-row agent reviews plus parent84; q24 availability misclassification corrected in preserved addendum; no model rerun. Non-human review."
+}

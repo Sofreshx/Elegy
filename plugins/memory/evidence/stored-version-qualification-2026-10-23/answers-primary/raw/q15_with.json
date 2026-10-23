@@ -1,0 +1,43 @@
+{
+  "answer": "Je n’ai pas accès au code d’audit privé de l’autre équipe dans Galen. Il n’est pas indiqué dans les données fournies.",
+  "threadId": "01a1686e-474c-7521-9d18-17af19c15078",
+  "usage": {
+    "input_tokens": 26517,
+    "cached_input_tokens": 13696,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 341,
+    "reasoning_output_tokens": 305
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a1686e-474c-7521-9d18-17af19c15078\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Je n’ai pas accès au code d’audit privé de l’autre équipe dans Galen. Il n’est pas indiqué dans les données fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26517,\"cached_input_tokens\":13696,\"cache_write_input_tokens\":0,\"output_tokens\":341,\"reasoning_output_tokens\":305}}\n",
+  "stderr": "2026-10-23T11:03:40.123678Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q15",
+  "arm": "with",
+  "startedAt": "2026-10-23T11:03:39.734709+00:00",
+  "completedAt": "2026-10-23T11:03:55.691275+00:00",
+  "elapsedMs": 15956.818,
+  "promptSha256": "4e93064b7525b8f1e6d0267623d4892a88f3bf4a341627743526dd45a0f7af86",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

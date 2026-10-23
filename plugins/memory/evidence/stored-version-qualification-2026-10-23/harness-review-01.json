@@ -1,0 +1,26 @@
+{
+  "status": "revise",
+  "findings": [
+    {
+      "id": "H1",
+      "severity": "P1",
+      "finding": "Local Q6 qualification code not sealed",
+      "resolution": "Eight file hashes in subject; phase pre/post and offline checks"
+    },
+    {
+      "id": "H2",
+      "severity": "P1",
+      "finding": "Prose review missing exact question/context input binding",
+      "resolution": "Canonical full input/map reconstruction; global input and per-row question/context/answer/raw/row hashes"
+    },
+    {
+      "id": "H3",
+      "severity": "P2",
+      "finding": "Normalized recall configuration only partially checked",
+      "resolution": "Exact13field dict and cwd; sealed runner resolves real isolated paths"
+    }
+  ],
+  "schemaVersion": "memory-static-harness-review/v1",
+  "reviewer": "Independent Codex-native agent; not human",
+  "sourceRevision": "95bf15ba2afa8e7655c45a8127b6a060893b695a"
+}

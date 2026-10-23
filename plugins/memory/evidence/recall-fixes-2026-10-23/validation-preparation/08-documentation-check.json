@@ -1,0 +1,7 @@
+{
+  "argv": "cargo run --offline --locked --target-dir D:/Projets/Elegy/target/qualification-oct23 -p elegy-documentation -- check --project . --json",
+  "note": "Blocked waiting for file lock on build directory; interrupted after confirmed stall.",
+  "file": "08-documentation-check",
+  "status": "TIMEOUT",
+  "exit": 1
+}

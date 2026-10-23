@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "<python>",
+    "-c",
+    "unittest four frozen modules excluding two checks requiring the upcoming actual replay"
+  ],
+  "exitCode": 1,
+  "durationSeconds": 35.602,
+  "log": "harness-preflight.log",
+  "logSha256": "c900d80d65a33a9e3ddc8131323e6a78dea21c4265e92bec7829cb8e0b91bb0f",
+  "subjectSha256": "01d2d162639b7aace41503649d18e3517c5ef1ddf81fc2266f42214ed7fd1d8c",
+  "sourceRevision": "95bf15ba2afa8e7655c45a8127b6a060893b695a",
+  "excludedChecks": "Two actual replay evidence mutation checks will run after replay and before model calls."
+}

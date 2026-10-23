@@ -1,0 +1,12 @@
+{
+  "answer": "READY",
+  "threadId": "01a166b9-6c0f-76a1-ab16-e016af69dd3c",
+  "usage": {
+    "input_tokens": 20509,
+    "cached_input_tokens": 10496,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 5,
+    "reasoning_output_tokens": 0
+  },
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a166b9-6c0f-76a1-ab16-e016af69dd3c\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"READY\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20509,\"cached_input_tokens\":10496,\"cache_write_input_tokens\":0,\"output_tokens\":5,\"reasoning_output_tokens\":0}}\n"
+}

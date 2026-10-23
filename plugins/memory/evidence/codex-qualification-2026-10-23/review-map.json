@@ -1,0 +1,579 @@
+{
+  "schemaVersion": "memory-prose-review-map/v1",
+  "records": [
+    {
+      "id": "02294798112ec50e",
+      "phase": "repeats",
+      "caseId": "q17",
+      "arm": "with",
+      "trial": 2
+    },
+    {
+      "id": "05ad8a175b0187e8",
+      "phase": "answers-primary",
+      "caseId": "q12",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "0709c8f1f499e4db",
+      "phase": "answers-transfer",
+      "caseId": "h06",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "0dc79afb8c029db0",
+      "phase": "answers-primary",
+      "caseId": "q12",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "10df2b07b9d59732",
+      "phase": "answers-transfer",
+      "caseId": "h10",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "186a92067bc8c790",
+      "phase": "answers-primary",
+      "caseId": "q04",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "1bee966b01f8671f",
+      "phase": "answers-primary",
+      "caseId": "q24",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "1c81d448958810cf",
+      "phase": "answers-transfer",
+      "caseId": "h10",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "1cbbf5f75e6a7cfc",
+      "phase": "answers-primary",
+      "caseId": "q05",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "1f7277fce5f31346",
+      "phase": "answers-primary",
+      "caseId": "q03",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "209b25d6412edaaa",
+      "phase": "answers-primary",
+      "caseId": "q17",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "20a2520f1f8e01ce",
+      "phase": "answers-primary",
+      "caseId": "q09",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "227cd750e1e81587",
+      "phase": "answers-primary",
+      "caseId": "q10",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "235fa92fc2d8d5cb",
+      "phase": "answers-primary",
+      "caseId": "q19",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "251b2aaef08c1b3d",
+      "phase": "answers-primary",
+      "caseId": "q11",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "284ef5a3523019c1",
+      "phase": "answers-primary",
+      "caseId": "q23",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "2a6577120ffaa98b",
+      "phase": "answers-transfer",
+      "caseId": "h04",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "3059bd7c7e70a927",
+      "phase": "answers-transfer",
+      "caseId": "h01",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "30d8d88c5eed96e0",
+      "phase": "answers-primary",
+      "caseId": "q22",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "34b84e9a33cea7cc",
+      "phase": "answers-transfer",
+      "caseId": "h01",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "365959f42cc4a120",
+      "phase": "answers-primary",
+      "caseId": "q01",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "37f00e4d7352d6f2",
+      "phase": "answers-primary",
+      "caseId": "q07",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "39e11714bcfe9074",
+      "phase": "answers-primary",
+      "caseId": "q02",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "41fcb83c74184884",
+      "phase": "answers-primary",
+      "caseId": "q06",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "4fa9e32dbe8c0b70",
+      "phase": "repeats",
+      "caseId": "q18",
+      "arm": "with",
+      "trial": 3
+    },
+    {
+      "id": "550fce38974c4695",
+      "phase": "answers-primary",
+      "caseId": "q14",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "5625d53225d27749",
+      "phase": "answers-primary",
+      "caseId": "q16",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "5be98beeff4526fa",
+      "phase": "answers-transfer",
+      "caseId": "h02",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "5d9d7f53c24255d2",
+      "phase": "answers-transfer",
+      "caseId": "h12",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "5e631ca98114bbff",
+      "phase": "repeats",
+      "caseId": "q08",
+      "arm": "with",
+      "trial": 2
+    },
+    {
+      "id": "6765e17b02acdc79",
+      "phase": "answers-primary",
+      "caseId": "q13",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "67a1986c4a29d322",
+      "phase": "answers-transfer",
+      "caseId": "h09",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "6c397ce3b9d5ac08",
+      "phase": "answers-transfer",
+      "caseId": "h09",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "6f31a2457bc82274",
+      "phase": "answers-primary",
+      "caseId": "q06",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "70377d7df354f545",
+      "phase": "answers-transfer",
+      "caseId": "h11",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "7044410e4be14382",
+      "phase": "answers-primary",
+      "caseId": "q14",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "70bf128ee2534659",
+      "phase": "answers-transfer",
+      "caseId": "h05",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "749c7486dd9d2d41",
+      "phase": "answers-primary",
+      "caseId": "q19",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "74fbbcacd4b20b2b",
+      "phase": "answers-primary",
+      "caseId": "q10",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "7928810f577bc253",
+      "phase": "answers-primary",
+      "caseId": "q05",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "7e799aa2daf871df",
+      "phase": "answers-primary",
+      "caseId": "q18",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "8761627d8e7e16af",
+      "phase": "answers-primary",
+      "caseId": "q22",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "89e333d2cea023c4",
+      "phase": "answers-primary",
+      "caseId": "q08",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "8b36d8a890657e56",
+      "phase": "answers-primary",
+      "caseId": "q07",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "9455dad32244fd05",
+      "phase": "answers-transfer",
+      "caseId": "h04",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "9f75c163a7fe6dc3",
+      "phase": "repeats",
+      "caseId": "q18",
+      "arm": "with",
+      "trial": 2
+    },
+    {
+      "id": "a37fb4a7e1ce65e5",
+      "phase": "answers-primary",
+      "caseId": "q21",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "a6c915f4d4640532",
+      "phase": "answers-transfer",
+      "caseId": "h06",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "a789031dd9702bde",
+      "phase": "answers-primary",
+      "caseId": "q23",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "ab60b00592b4ca67",
+      "phase": "repeats",
+      "caseId": "q09",
+      "arm": "with",
+      "trial": 3
+    },
+    {
+      "id": "ae8580d09263a4d5",
+      "phase": "answers-transfer",
+      "caseId": "h08",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "b214adb3a353757b",
+      "phase": "repeats",
+      "caseId": "q17",
+      "arm": "with",
+      "trial": 3
+    },
+    {
+      "id": "b2e9356559083cbe",
+      "phase": "repeats",
+      "caseId": "q08",
+      "arm": "with",
+      "trial": 3
+    },
+    {
+      "id": "b4095c5474d9557e",
+      "phase": "repeats",
+      "caseId": "q11",
+      "arm": "with",
+      "trial": 2
+    },
+    {
+      "id": "b57f17ef5ab04eb4",
+      "phase": "repeats",
+      "caseId": "q11",
+      "arm": "with",
+      "trial": 3
+    },
+    {
+      "id": "b5ac59d073dc6329",
+      "phase": "answers-primary",
+      "caseId": "q09",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "b774d4b4f55af775",
+      "phase": "answers-transfer",
+      "caseId": "h11",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "b79bde9606d95a1a",
+      "phase": "answers-transfer",
+      "caseId": "h03",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "b92d842cecca2a20",
+      "phase": "answers-primary",
+      "caseId": "q21",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "b9a731e466d3dc1b",
+      "phase": "answers-primary",
+      "caseId": "q11",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "b9ec3e6a596c1551",
+      "phase": "answers-transfer",
+      "caseId": "h12",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "bce6f164ffecb9ef",
+      "phase": "answers-transfer",
+      "caseId": "h07",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "c382dd82e01d9faa",
+      "phase": "answers-primary",
+      "caseId": "q13",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "c3f8e3332b45cbce",
+      "phase": "answers-primary",
+      "caseId": "q03",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "c40737245610b3ac",
+      "phase": "answers-primary",
+      "caseId": "q18",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "c4387cade156deb0",
+      "phase": "answers-primary",
+      "caseId": "q16",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "ca6c2c784a4c1ad8",
+      "phase": "answers-primary",
+      "caseId": "q02",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "cac2e9358b8f2a88",
+      "phase": "answers-transfer",
+      "caseId": "h07",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "cb382bdc5d6b14a1",
+      "phase": "answers-primary",
+      "caseId": "q20",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "cd95e67a4e4f1b56",
+      "phase": "repeats",
+      "caseId": "q09",
+      "arm": "with",
+      "trial": 2
+    },
+    {
+      "id": "d1328957789a18ec",
+      "phase": "answers-transfer",
+      "caseId": "h05",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "d5c6419e810bcfc8",
+      "phase": "answers-primary",
+      "caseId": "q01",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "ddf4ec3b7ab560bd",
+      "phase": "answers-primary",
+      "caseId": "q15",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "e7815ec56100446a",
+      "phase": "answers-primary",
+      "caseId": "q20",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "ea06bf15e24042d9",
+      "phase": "answers-primary",
+      "caseId": "q17",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "ec0e023a361ce189",
+      "phase": "answers-primary",
+      "caseId": "q08",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "eec1d6b22f15c6e3",
+      "phase": "answers-primary",
+      "caseId": "q24",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "f2ddb324cc45a666",
+      "phase": "answers-primary",
+      "caseId": "q15",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "f57924dc8a341e34",
+      "phase": "answers-primary",
+      "caseId": "q04",
+      "arm": "without",
+      "trial": 1
+    },
+    {
+      "id": "f8f905344761c024",
+      "phase": "answers-transfer",
+      "caseId": "h08",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "fa37ccffa2a55863",
+      "phase": "answers-transfer",
+      "caseId": "h02",
+      "arm": "with",
+      "trial": 1
+    },
+    {
+      "id": "fec9a559178058a7",
+      "phase": "answers-transfer",
+      "caseId": "h03",
+      "arm": "with",
+      "trial": 1
+    }
+  ]
+}

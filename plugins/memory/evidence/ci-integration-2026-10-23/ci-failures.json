@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "memory-pr-ci-triage/v1",
+  "testedHead": "a753b4b5f4bddf553a5b11255b3532957291d9c2",
+  "base": "619f5dd705e6383a12b7d806369633df291fc1a3",
+  "originalLockMatchesBase": true,
+  "lockGitSha256": "2205277db0bb3b7fb10bf6beb77b4f1f253c754d2cdcad372b9465f4b5953e3e",
+  "pr": "https://github.com/Sofreshx/Elegy/pull/49",
+  "failures": [
+    {
+      "job": "contracts-validate",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/39947639616/job/120394096710",
+      "cause": "Regex.Match received null for an empty tracked evidence file; contracts command itself passed."
+    },
+    {
+      "job": "packaging smoke",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/39947639599/job/120394096869",
+      "cause": "Same repo-shape empty-file exception, confirmed by in-memory filtered log flags."
+    },
+    {
+      "job": "cargo-audit / cargo-deny",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/39947639638",
+      "cause": "14 newly published advisories in the unchanged base lockfile. No advisories suppressed."
+    },
+    {
+      "job": "gitleaks",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/39947639638/job/120394096911",
+      "cause": "10 exact historical resource_auth.rs SHA-256 field false positives; matched against immutable Git product bytes. Raw log not persisted."
+    }
+  ],
+  "securityDependencies": {
+    "quinn-proto": {
+      "before": "0.11.15",
+      "minimum": "0.11.18",
+      "advisories": [
+        "RUSTSEC-2026-0340",
+        "RUSTSEC-2026-0338",
+        "RUSTSEC-2026-0341",
+        "RUSTSEC-2026-0339",
+        "RUSTSEC-2026-0342"
+      ]
+    },
+    "rustls": {
+      "before": "0.23.45",
+      "minimum": "0.23.46",
+      "advisories": [
+        "RUSTSEC-2026-0346",
+        "RUSTSEC-2026-0347",
+        "RUSTSEC-2026-0348",
+        "RUSTSEC-2026-0349"
+      ]
+    },
+    "rustls-webpki": {
+      "before": "0.103.15",
+      "minimum": "0.103.16",
+      "advisories": [
+        "RUSTSEC-2026-0382"
+      ]
+    },
+    "webpki-roots": {
+      "before": "1.0.8",
+      "minimum": "1.0.10",
+      "advisories": [
+        "RUSTSEC-2026-0381"
+      ]
+    },
+    "zip": {
+      "before": "2.4.2",
+      "minimum": "9.0.0",
+      "advisories": [
+        "RUSTSEC-2026-0367",
+        "RUSTSEC-2026-0368",
+        "RUSTSEC-2026-0369"
+      ]
+    }
+  },
+  "passed": [
+    "workspace tests Windows",
+    "workspace tests Linux",
+    "workspace tests macOS",
+    "fmt",
+    "Clippy warnings denied",
+    "MSRV Rust1.88",
+    "release Memory eval",
+    "documentation",
+    "CodeQL",
+    "zizmor",
+    "contracts distribution",
+    "installer bootstrap"
+  ],
+  "limits": "This historical CI snapshot is for a753b4b only. Final source and final CI require their own verification."
+}

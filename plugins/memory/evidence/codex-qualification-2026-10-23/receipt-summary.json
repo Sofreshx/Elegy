@@ -1,0 +1,93 @@
+{
+  "schemaVersion": "memory-codex-assessment/v1",
+  "status": "quality-failed",
+  "evidenceConsistent": true,
+  "selectedConfigurationQualified": false,
+  "threadCount": 82,
+  "errors": [],
+  "metrics": {
+    "pairCount": 36,
+    "meanWithRecall": 0.9583333333333334,
+    "meanWithoutRecall": 0.35648148148148145,
+    "meanPairedDelta": 0.6018518518518519,
+    "completeWithRecall": 34,
+    "completeWithoutRecall": 13,
+    "meanWholeProcessMsWith": 14902.078777777777,
+    "meanWholeProcessMsWithout": 15298.688388888888
+  },
+  "cohorts": {
+    "answers-primary": {
+      "pairCount": 24,
+      "meanWithRecall": 0.9791666666666666,
+      "meanWithoutRecall": 0.3819444444444444,
+      "meanPairedDelta": 0.5972222222222222,
+      "completeWithRecall": 22,
+      "completeWithoutRecall": 8,
+      "meanWholeProcessMsWith": 14770.43125,
+      "meanWholeProcessMsWithout": 15171.907541666667
+    },
+    "answers-transfer": {
+      "pairCount": 12,
+      "meanWithRecall": 0.9166666666666666,
+      "meanWithoutRecall": 0.3055555555555556,
+      "meanPairedDelta": 0.6111111111111112,
+      "completeWithRecall": 12,
+      "completeWithoutRecall": 5,
+      "meanWholeProcessMsWith": 15165.373833333333,
+      "meanWholeProcessMsWithout": 15552.250083333332
+    }
+  },
+  "failedAnswers": [
+    {
+      "key": [
+        "answers-primary",
+        "q08",
+        "with",
+        1
+      ],
+      "reason": "prose gate failed",
+      "flags": {
+        "grounded": false,
+        "controlPass": true,
+        "formatPass": true,
+        "taskComplete": false
+      }
+    },
+    {
+      "key": [
+        "answers-primary",
+        "q20",
+        "with",
+        1
+      ],
+      "reason": "prose gate failed",
+      "flags": {
+        "grounded": true,
+        "controlPass": true,
+        "formatPass": true,
+        "taskComplete": false
+      }
+    },
+    {
+      "key": [
+        "repeats",
+        "q08",
+        "with",
+        3
+      ],
+      "reason": "prose gate failed",
+      "flags": {
+        "grounded": false,
+        "controlPass": true,
+        "formatPass": true,
+        "taskComplete": false
+      }
+    }
+  ],
+  "subjectSha256": "a5b2d87ba87446c1f2f56e606b5c1a95acc3124dfccfea4d58bd08beee28dca3",
+  "protocolSha256": "1c1f25e1fe83b513f78e54c05bb1809bfd945f5546110ec1c2163fb10e2d4908",
+  "assessorSha256": "9ed04a451f31fdf460dfc6eeb414205317365bafcc5c883909f0fa0c5903bd89",
+  "semanticReviewSha256": "1d821e7d2e409d6f6f5f0c0fbc7616695c4a77decb4591225bd61e013b6b20ac",
+  "limits": "Finite synthetic explicit recall on Codex CLI gpt-6.1-sol/max. Luna adverse evidence retained. No automatic Desktop hook, full settings, second software host, universal quality or monetary saving claim.",
+  "reviewMethod": "Independent agent review02, checked by parent; review01 rejected and retained. Not human scoring."
+}

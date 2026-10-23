@@ -1,0 +1,108 @@
+{
+  "schemaVersion": "memory-native-evidence-review/v1",
+  "status": "approved",
+  "reviewer": "Independent ci_integration_review, read-only; parent checked new harness result and exact log-derivative metadata.",
+  "sourceRevision": "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1",
+  "qualificationFreezeRevision": "90094e9147824fe9a70c9b45ee29e3d92fb74b25",
+  "findings": [],
+  "checks": [
+    {
+      "name": "build-final-02",
+      "recordSha256": "bafec82df17ac283e3280729b57768aaa8fcf8ea3480d9baf1727a574c4a9583",
+      "publicLogSha256": "31ec6bb3c783e4202a79f5f0f156bacac031b1aae596eb6e235cc717e38427e4",
+      "rawLogSha256": "31ec6bb3c783e4202a79f5f0f156bacac031b1aae596eb6e235cc717e38427e4",
+      "exitCode": 0,
+      "durationSeconds": 171.562,
+      "sourceUnchanged": true,
+      "testTotals": null,
+      "testResultLines": 0
+    },
+    {
+      "name": "zip-tests-final",
+      "recordSha256": "8907b3eae7a0c098cdcae39e077ce935fe4b2e0ac789511ce5e4cc58d30983dc",
+      "publicLogSha256": "90bc30b429456f4b47f3759c37501d480f57d9dfe669c328e01712da3a461895",
+      "rawLogSha256": "d2f19ec437358cc43a4455c1d0576abe0f7e22056f33d6cd8ca565228fef5105",
+      "exitCode": 101,
+      "durationSeconds": 354.063,
+      "sourceUnchanged": true,
+      "testTotals": {
+        "passed": 15,
+        "failed": 6,
+        "ignored": 0
+      },
+      "testResultLines": 2
+    },
+    {
+      "name": "zip-tests-final-02",
+      "recordSha256": "c0a2096eea6b7fc5cfdde616226b4822c2bc93ca3824341b647d5638c6ad6302",
+      "publicLogSha256": "75749c41dfc9cf198d4213c26d815afbd39f090f78139c469c4bd0f2cd31d5a4",
+      "rawLogSha256": "4ba6e73ebedfb0c7c7601754516a45baba1946348ce09a1cdb4bd77b893ef9e0",
+      "exitCode": 0,
+      "durationSeconds": 190.125,
+      "sourceUnchanged": true,
+      "testTotals": {
+        "passed": 151,
+        "failed": 0,
+        "ignored": 0
+      },
+      "testResultLines": 19
+    },
+    {
+      "name": "contextual-final",
+      "recordSha256": "2a5225e129fdc09d4b74b90096d8be3d8f8bfa11ab2625d5186d825badb6844f",
+      "publicLogSha256": "4735b98356db7e4093dbd32d818a0db5ff3ddf28718da604101e1f1b5b42d24c",
+      "rawLogSha256": "a4fcb9211ce8f898684c6f8b9ba7d357a45b69a66462f9a3844d6a496a7a484f",
+      "exitCode": 0,
+      "durationSeconds": 139.031,
+      "sourceUnchanged": true,
+      "testTotals": {
+        "passed": 31,
+        "failed": 0,
+        "ignored": 0
+      },
+      "testResultLines": 1
+    },
+    {
+      "name": "format-final",
+      "recordSha256": "73b5f170dd94b03215bc857615d92e140cd7bf3bd970100dd9726c1ec7b3e6d1",
+      "publicLogSha256": "d8760763be63067f00789fcf42648cb7e89259b37690e733415676ec0b8b6596",
+      "rawLogSha256": "d8760763be63067f00789fcf42648cb7e89259b37690e733415676ec0b8b6596",
+      "exitCode": 0,
+      "durationSeconds": 5.062,
+      "sourceUnchanged": true,
+      "testTotals": null,
+      "testResultLines": 0
+    },
+    {
+      "name": "harness-final",
+      "recordSha256": "fb19fa6003b431e6bcb31b984643da3e6968a268976a72e3417afe807b22f930",
+      "publicLogSha256": "9d7462f9ce55def7029c6801748764a6dba4018152caceb04ce5f4d938d28772",
+      "rawLogSha256": "9d7462f9ce55def7029c6801748764a6dba4018152caceb04ce5f4d938d28772",
+      "exitCode": 0,
+      "durationSeconds": 13.422,
+      "sourceUnchanged": true,
+      "testTotals": null,
+      "testResultLines": 0
+    }
+  ],
+  "replayProof": {
+    "path": "replay-checks.json",
+    "sha256": "cd36499254f2e522b210e93610d6a864d5d58a1e0459577d9b5e9ee76912799d",
+    "packets": 37,
+    "sourceUnchanged": 37,
+    "verifiedEmptyNamespaces": 24,
+    "controls": 42
+  },
+  "environmentFailure": "First four-package native run stopped on six Accounts integration failures with StorageFull on C. The run was preserved. Same source and command passed with child-only temp on D. This was not a Memory answer failure.",
+  "tempPathAddendum": {
+    "path": "native-validation/temp-space-clarification.json",
+    "sha256": "10dbcaf7389879573958498c528d9c2618be3ea37ae232792033af2c16438727",
+    "correction": "Independent reviewer initially inferred the earlier temp location from current Q7 directory existence. Runner command confirmation establishes repository-root runtime/native-temp for first three commands and Q7 runtime/native-temp for harness-final. Both are isolated on D."
+  },
+  "logPublication": {
+    "path": "native-validation/log-publication.json",
+    "sha256": "bead578cd3d187c0f16e32b9cf8f026d480f8067fb3f035c20dce7a9fd28d65b",
+    "note": "Independent audit read original raw logs. Public derivatives neutralize only path tokens, retaining both hashes and exact originals locally."
+  },
+  "limits": "Native product/ZIP/format/harness/replay evidence only; no model-answer verdict. Historical full Memory/MCP/hook checks are reused where unchanged; final exact-head CI remains required."
+}

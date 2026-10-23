@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "memory-repository-context/v1",
+  "baseRevision": "619f5dd705e6383a12b7d806369633df291fc1a3",
+  "baseIncludes": "MergedPR48 contributor/retrieval changes, after mergedPR47",
+  "startingPullRequest": 47,
+  "startingMergeRevision": "f4445a4c01359ec23238d01ab6470292c05732cd",
+  "productSourceRevision": "95bf15ba2afa8e7655c45a8127b6a060893b695a",
+  "qualificationFreezeRevision": "2d4f788285a3b42ae905e9d73bb2b28910bb8a84",
+  "canonicalCheckoutClean": true,
+  "concurrentOpenPullRequests": [
+    41,
+    42,
+    43,
+    44,
+    45
+  ],
+  "concurrentScope": "Dependabot GitHub Actions updates; no Memory overlap at inspection",
+  "workingTreeIsolation": "Task worktree; other owners worktrees preserved",
+  "publicDestination": "https://github.com/Sofreshx/Elegy.git",
+  "targetBranch": "main",
+  "accountCheck": "PASS; existing configured authentication, no credential/configuration changes",
+  "identityGate": "PASS",
+  "pushPermission": true,
+  "mergeCommitAllowed": true,
+  "branchProtected": false,
+  "publicationEffect": "Existing Publish Orchestrator creates/updates main-snapshot prerelease after push/merge to main; no workflow change.",
+  "integration": "Explicitly requested ordinary push/PR/merge after applicable gates; no force-push or GitHub auto-merge."
+}

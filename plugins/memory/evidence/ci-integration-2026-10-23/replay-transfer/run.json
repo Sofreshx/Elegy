@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "memory-generic-replay/v1",
+  "startedAt": "2026-10-23T13:28:29.264094+00:00",
+  "status": "completed",
+  "sourceRevision": "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1",
+  "cliSha256": "55b76918b44dc1e556a027f444d0c47c8e1175bae6d3d7a59df1fc274917afd6",
+  "mcpSha256": "ad5e338e9733a0dd1516e9fec28b99f625fe63246c0b52cf929ddc9b1cf83c7b",
+  "corpusSha256": "6987ed6bb624648d73dad0272de3d602c47b20af5b868017a76aaa4b06a7e893",
+  "protocolSha256": "1f42dfc566ce2d2cf525ddb0021fb3fc9da8ee845fb78306b2ad74efddbd6a76",
+  "runnerSha256": "0af3c61bd27151e9b2e2d8c2a92b8925411f35cdc0e548a747576dc9dd045c30",
+  "answerRunnerSha256": "9bd417a00518bccc0d61e75908996e0bdc80b62db9a6b96e8e278f831994ae0b",
+  "runReplaySha256": "1581b08a921e4dca1bec1207ceed384d883f6061319c3edc519d25a97eed4d1f",
+  "gradeSha256": "bf330b80fa97bc734f73e4a8c3c9257201ba12fb0ecbc52277b2e46bbb78cf54",
+  "rpcSupportSha256": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759",
+  "episodes": [
+    {
+      "id": "nacre",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "1579a0084e54513a3925431a92db6e0058fbdf13d9f92e2842998c99cb9286e2",
+      "error": null
+    },
+    {
+      "id": "quartz",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "099535e79d3fc3c3c3a52f205d55cf58300b53864f0b50443a1e08b681b1cb54",
+      "error": null
+    },
+    {
+      "id": "brume",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "a547380627d0fe314f56721152e6d37da3466b1b037f69da9d3f5564ab3e5929",
+      "error": null
+    },
+    {
+      "id": "mistral",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "65103f6bafb7884e08e4c47ed216594e0304ff8d37c80da76ccb2199c629d1ba",
+      "error": null
+    }
+  ],
+  "completedAt": "2026-10-23T13:28:44.435171+00:00",
+  "cliSha256After": "55b76918b44dc1e556a027f444d0c47c8e1175bae6d3d7a59df1fc274917afd6",
+  "mcpSha256After": "ad5e338e9733a0dd1516e9fec28b99f625fe63246c0b52cf929ddc9b1cf83c7b"
+}

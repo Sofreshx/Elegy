@@ -73,7 +73,13 @@ foreach ($file in $trackedFiles) {
         continue
     }
 
-    $text = Get-Content -LiteralPath $fullPath -Raw -ErrorAction SilentlyContinue
+    try {
+        $text = [string](Get-Content -LiteralPath $fullPath -Raw -ErrorAction Stop)
+    }
+    catch {
+        Add-Issue "content.unreadable" $file "Tracked file content could not be read."
+        continue
+    }
     $match = [regex]::Match($text, $localPathPattern)
     if ($match.Success) {
         Add-Issue "content.local_path" $file "Tracked file contains a local absolute path token: $($match.Value)"

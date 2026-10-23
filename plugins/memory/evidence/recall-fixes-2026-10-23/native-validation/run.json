@@ -1,0 +1,216 @@
+{
+  "mode": "sequential; reviewed native process permissions; child-only scratch TEMP and loopback proxy exclusions",
+  "results": [
+    {
+      "name": "provider-timeout-controls",
+      "argv": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "D:/Projets/Elegy/target/qualification-oct23",
+        "-p",
+        "elegy-memory",
+        "--lib",
+        "offline_timeout_returns_clear_error",
+        "--",
+        "--test-threads=1"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 153.796,
+      "log": "provider-timeout-controls.log",
+      "logSha256": "d73aed6301d42e888348fe46c8cee44639fecfc8154c54e0e1955be40fb5977b"
+    },
+    {
+      "name": "memory",
+      "argv": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "D:/Projets/Elegy/target/qualification-oct23",
+        "-p",
+        "elegy-memory"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1403.346,
+      "log": "memory.log",
+      "logSha256": "c6accfb55c6aba14ee0421103be12a1f77d8635d26e90b39876a1749a6c577ee"
+    },
+    {
+      "name": "mcp",
+      "argv": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "D:/Projets/Elegy/target/qualification-oct23",
+        "-p",
+        "elegy-memory-mcp"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1077.793,
+      "log": "mcp.log",
+      "logSha256": "f50ab7690c9a47d6f3f42b1de1e80a374d1ae53c8d1d1e542595ad1290353735"
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "D:/Projets/Elegy/target/qualification-oct23",
+        "-p",
+        "elegy-memory",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 91.625,
+      "log": "clippy.log",
+      "logSha256": "98782b581e91f0f3b745efb5f7d4edeeef02501738fccc91b7bf78dc24363adb"
+    },
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 6.255,
+      "log": "fmt.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "hook",
+      "argv": [
+        "<python>",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "plugins/memory/integrations/codex",
+        "-p",
+        "test_*.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 8.128,
+      "log": "hook.log",
+      "logSha256": "15e6684d2abdbc740d660ee30990471d49c43c7b01f0da485b65fa8e494fa09a"
+    },
+    {
+      "name": "evidence",
+      "argv": [
+        "<python>",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "plugins\\memory\\evidence\\recall-fixes-2026-10-23",
+        "-p",
+        "test_*.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.628,
+      "log": "evidence.log",
+      "logSha256": "585be6c7c9baf0fdaebe88ae33c559a9ff9ec7bdc672f786fa9c42a2c1506a8d"
+    },
+    {
+      "name": "contracts",
+      "argv": [
+        "cargo",
+        "run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "D:/Projets/Elegy/target/qualification-oct23",
+        "-p",
+        "elegy-core",
+        "--bin",
+        "elegy-contracts",
+        "--",
+        "--project",
+        ".",
+        "contracts",
+        "validate"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 6.79,
+      "log": "contracts.log",
+      "logSha256": "9af1f45603ea6e851dc72e894b6dcb7a95327c09daae559eb21b848168f751f4"
+    },
+    {
+      "name": "docs",
+      "argv": [
+        "cargo",
+        "run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "D:/Projets/Elegy/target/qualification-oct23",
+        "-p",
+        "elegy-documentation",
+        "--",
+        "check",
+        "--project",
+        ".",
+        "--json"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 78.446,
+      "log": "docs.log",
+      "logSha256": "158c33c08fee7bf498fd637be87f0b6429846eb72e5e4bb0329590b12f112b91"
+    },
+    {
+      "name": "build",
+      "argv": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "D:/Projets/Elegy/target/qualification-oct23",
+        "-p",
+        "elegy-memory",
+        "-p",
+        "elegy-memory-mcp",
+        "--bin",
+        "elegy-memory",
+        "--bin",
+        "elegy-memory-mcp-stdio"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 122.291,
+      "log": "build.log",
+      "logSha256": "be5002aa57130eff067c3de60cef9dada3850016c20c590475e6cf18884914f1"
+    }
+  ],
+  "schemaVersion": "memory-native-validation/v1",
+  "productSourceRevision": "b828223bd9897c559a4ed9ed39f3c17f34284033",
+  "cliSourceSha256": "52f9318b24099cdafb5a7aca6ec1dbac16cf5e6dd05f1352b72801ec9ebece70",
+  "completedAt": "2026-10-23T05:31:05.252949+00:00",
+  "testCounts": {
+    "memory": 408,
+    "memoryMcp": 67,
+    "codexHookPython": 14,
+    "evidencePython": 14,
+    "focusedTimeoutRecheck": 2
+  },
+  "countNote": "Focused timeout tests are also included in the complete Memory suite; do not double count.",
+  "status": "passed",
+  "binaryHashesAfterBuild": {
+    "cli": "b549f07f81cc0f87adf3dd287cee53252c45d6af74000e3084f78fea9c794e28",
+    "mcp": "cc6ff585a4a49cec3826a0591616b5f0d08356674825eaf2867fa7342714bd47"
+  },
+  "qualificationBinaries": "Immutable pre-trial copies in runtime/qualified-binaries, bound by subject.json; final build never replaces those qualification copies."
+}

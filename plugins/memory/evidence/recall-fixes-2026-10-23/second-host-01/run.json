@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "memory-second-host-preflight/v1",
+  "startedAt": "2026-10-23T05:07:20.606838+00:00",
+  "host": "OpenCode",
+  "binarySha256": "ea4f4d4bec95cd41baf0fc53adc4e34b31e1c8676dc5b2507c8797ab1884af18",
+  "catalogSha256": "03a6f243756816b06d009b94539de20a08686dce93602008763db9c026cd9eed",
+  "modelMetadata": {
+    "id": "big-pickle",
+    "providerID": "opencode",
+    "name": "Big Pickle",
+    "family": "big-pickle",
+    "api": {
+      "id": "big-pickle",
+      "url": "https://opencode.ai/zen/v1",
+      "npm": "@ai-sdk/openai-compatible"
+    },
+    "status": "active",
+    "headers": {},
+    "options": {},
+    "cost": {
+      "input": 0,
+      "output": 0,
+      "cache": {
+        "read": 0,
+        "write": 0
+      }
+    },
+    "limit": {
+      "context": 200000,
+      "input": 160000,
+      "output": 32000
+    },
+    "capabilities": {
+      "temperature": true,
+      "reasoning": true,
+      "attachment": false,
+      "toolcall": true,
+      "input": {
+        "text": true,
+        "audio": false,
+        "image": false,
+        "video": false,
+        "pdf": false
+      },
+      "output": {
+        "text": true,
+        "audio": false,
+        "image": false,
+        "video": false,
+        "pdf": false
+      },
+      "interleaved": {
+        "field": "reasoning_content"
+      }
+    },
+    "release_date": "2025-10-17",
+    "variants": {}
+  },
+  "configuration": {
+    "autoupdate": false,
+    "share": "disabled",
+    "snapshot": false,
+    "enabled_providers": [
+      "opencode"
+    ],
+    "model": "opencode/big-pickle",
+    "small_model": "opencode/big-pickle",
+    "plugin": [],
+    "mcp": {},
+    "permission": "deny",
+    "lsp": false,
+    "formatter": false
+  },
+  "commands": [
+    {
+      "name": "version",
+      "argv": [
+        "<installed-opencode>",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdoutSha256": "4a830c412419a3308d095a64e4fd2504b26d1e975366e089d886c03d90fa016c",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "paths",
+      "argv": [
+        "<installed-opencode>",
+        "--pure",
+        "debug",
+        "paths"
+      ],
+      "exitCode": 0,
+      "stdoutSha256": "19da354bf4fc39ac972108275552f45e608d783d030e35f423b185d4dab63c0c",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "memoryIntegrationExercised": false,
+  "paidApiCalls": 0,
+  "status": "inconclusive"
+}

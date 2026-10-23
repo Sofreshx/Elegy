@@ -1,0 +1,18 @@
+
+--- stderr ---
+   Compiling rustls v0.23.46
+   Compiling rustls-webpki v0.103.16
+   Compiling webpki-roots v1.0.10
+   Compiling zlib-rs v0.6.8
+   Compiling typed-path v0.12.4
+   Compiling elegy-memory v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-fixes\plugins\memory)
+   Compiling tokio-rustls v0.26.4
+   Compiling flate2 v1.1.9
+   Compiling zip v9.0.5
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.12.28
+   Compiling elegy-adapter-http v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-fixes\shared\adapter-http)
+   Compiling elegy-runtime v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-fixes\shared\runtime)
+   Compiling elegy-core v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-fixes\shared\core)
+   Compiling elegy-memory-mcp v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-fixes\hosts\memory-mcp)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2m 51s

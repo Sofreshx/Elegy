@@ -1,0 +1,24 @@
+{
+  "status": "passed",
+  "findings": [],
+  "resolved": [
+    "H1",
+    "H2",
+    "H3"
+  ],
+  "subjectSha256": "01d2d162639b7aace41503649d18e3517c5ef1ddf81fc2266f42214ed7fd1d8c",
+  "qualificationSourceFiles": {
+    "campaign.py": "5ccdf26ab7a836948e27a98f74830ef291eefe249a8a7e94b1eeef37dfc00fc7",
+    "assess.py": "a02fa675d11a342ce8aaf89d9ffaccb0f56a6791ede49eae41f91bae503c78d1",
+    "prepare_review.py": "824c7f085ec7c16f7affde93e61995849e90cd6cee14e46f414a7edb6de13cf1",
+    "verify_source.py": "c937d7496969df94dafa22d9460934d7127f64c557cf7711516dcc66665dabcd",
+    "test_campaign.py": "a0668f75ae721121c87b6bf08c559c3b532cc3e9e48f551f4c6f5b63117179ae",
+    "test_assess.py": "d0214b2e6e88d1d0ee7318f1e3bf2c37de98aaea60031eb11143101f3e8141bf",
+    "test_verify_source.py": "135b81475aa4dd938fd92bd740b95e92a1ea958315e135145efec97883ed9494",
+    "test_evidence_binding.py": "b4ee36e9b084db7678d380972c7c3eedac2ccba05b046ff72c960f013dcecd10"
+  },
+  "scope": "Follow-up read-only review of three harness binding corrections; no model/runtime verdict",
+  "schemaVersion": "memory-static-harness-review/v1",
+  "reviewer": "Independent Codex-native agent; not human",
+  "sourceRevision": "95bf15ba2afa8e7655c45a8127b6a060893b695a"
+}

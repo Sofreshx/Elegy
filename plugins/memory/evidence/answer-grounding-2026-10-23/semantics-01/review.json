@@ -1,0 +1,455 @@
+{
+  "schemaVersion": "memory-diagnostic-prose-review/v1",
+  "runSha256": "c10a73d11956989482363005b024b0ae2bfc551474a7cbc18bfd8290b622b65b",
+  "reviewMethod": "Independent native reviewer read all44 outputs; parent read all44 outputs and accepted the listed per-answer verdicts. This is an agent prose review, not a human review.",
+  "records": [
+    {
+      "condition": "historical-generic",
+      "caseId": "q08",
+      "trial": 1,
+      "rawSha256": "3f1a960fb9350b46b080e839e454a7b82e35ce24a5ed903413dd84b1c28b2b69",
+      "answerSha256": "253223fe83cb996cc29764d1700edc9674b20e7a3e3c708f3e4c57a27bd93781",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "historical-generic",
+      "caseId": "q09",
+      "trial": 1,
+      "rawSha256": "0815f5cade43cb24a38312622d66c76032463162f085c19a07d6f03b43635384",
+      "answerSha256": "69324bb60818b341cfab74f08c22da9d272d790a1c2dd9e3078b6a520245cb9e",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "historical-generic",
+      "caseId": "q11",
+      "trial": 1,
+      "rawSha256": "b49c02d1ca67437c981ed5a154371df357f8b23208213aae26784d4d650d8a86",
+      "answerSha256": "613257fe133c9a3c9a7ed432ec6701522d684e8dde19e7ae778bb6245fb83a95",
+      "lexicalPass": false,
+      "prosePass": false,
+      "reason": "Declares both explicitly supplied maintenance fields unknown."
+    },
+    {
+      "condition": "historical-generic",
+      "caseId": "q17",
+      "trial": 1,
+      "rawSha256": "09b2c73e056635f0ddd972856a0c4b0e98efe9446002826ff432893334ea509e",
+      "answerSha256": "ab79e6fe77c9973e1432d905b1dc8a2a44cdb742935b6ac015d60e9f5d3d974c",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "historical-generic",
+      "caseId": "q18",
+      "trial": 1,
+      "rawSha256": "7477e052d78fd598e3265677baab827507f7dce620dd9d1f4b7dfe71a6374f58",
+      "answerSha256": "b10f7347f37a2a05ebed04a2c695b3048fcbd063d392808891c68c2e4efce9eb",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "historical-generic",
+      "caseId": "q08",
+      "trial": 2,
+      "rawSha256": "a8502035ac8b5145f8bae8f75f5ce8bb28d03d40d6f3694fca8e7c64ac34eaee",
+      "answerSha256": "adc58ab56df1982564b57207091b0cc47ba4feffc905b8637732504f75fc696b",
+      "lexicalPass": false,
+      "prosePass": false,
+      "reason": "Omits the explicitly supplied corrected retention11."
+    },
+    {
+      "condition": "historical-generic",
+      "caseId": "q09",
+      "trial": 2,
+      "rawSha256": "01eb67ca4f2ee51c8d430667e35bdd1f0c2df23d328b242fa43143c8d7216cea",
+      "answerSha256": "36899bac03ec481d1d6a69cbc0daf25ab383d6428de42637ba8d8972cd97fcf0",
+      "lexicalPass": false,
+      "prosePass": false,
+      "reason": "Substitutes the runbook name for an absent backup-instance ID."
+    },
+    {
+      "condition": "historical-generic",
+      "caseId": "q11",
+      "trial": 2,
+      "rawSha256": "2f872b74f04e4d9a611ac4697d2ef7af26f1a87c9e09d618dc1cfc790fe7aff3",
+      "answerSha256": "8c93eb9fb9d2a7716f2d7adcb4b239a6ce883f5db6a1a8c190ff6391d858c947",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "historical-generic",
+      "caseId": "q08",
+      "trial": 3,
+      "rawSha256": "070b79004dbc3a507276e3b8d03832fbb8c7e2b62209d7238789287c8e07d2d4",
+      "answerSha256": "c11ce3c0fd74e283d4aef7b4546b6521ba49ba41b397391dfab21b97e25345cf",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "historical-generic",
+      "caseId": "q09",
+      "trial": 3,
+      "rawSha256": "70f19d9c48aa9816e97cbfeb1bbbb2eec398b6f9de22bd1f8acd7cdfd93ccd54",
+      "answerSha256": "36899bac03ec481d1d6a69cbc0daf25ab383d6428de42637ba8d8972cd97fcf0",
+      "lexicalPass": false,
+      "prosePass": false,
+      "reason": "Substitutes the runbook name for an absent backup-instance ID."
+    },
+    {
+      "condition": "historical-generic",
+      "caseId": "q11",
+      "trial": 3,
+      "rawSha256": "664d5bb81feab683ad4fdee468c0de26b7115321e1d69d2e2e95dff5baa8b276",
+      "answerSha256": "36d831dfc23a6c8960d1a30d3719b99d65eb4607c63e185480381481f897dacd",
+      "lexicalPass": false,
+      "prosePass": false,
+      "reason": "Omits the supplied maintenance time14:50."
+    },
+    {
+      "condition": "historical-typed",
+      "caseId": "q08",
+      "trial": 1,
+      "rawSha256": "3d4224b506a1bb35aafb9ae79be101df3d83ec0ec2e4b80af9d0216916971e6e",
+      "answerSha256": "c11ce3c0fd74e283d4aef7b4546b6521ba49ba41b397391dfab21b97e25345cf",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "historical-typed",
+      "caseId": "q09",
+      "trial": 1,
+      "rawSha256": "bb18fdc0029ce31926572aa6f509d4de19231f2eacb1494003c21ebf55aa490b",
+      "answerSha256": "36899bac03ec481d1d6a69cbc0daf25ab383d6428de42637ba8d8972cd97fcf0",
+      "lexicalPass": false,
+      "prosePass": false,
+      "reason": "Substitutes the runbook name for an absent backup-instance ID."
+    },
+    {
+      "condition": "historical-typed",
+      "caseId": "q11",
+      "trial": 1,
+      "rawSha256": "a1c56217931e609bbae683aa81fb0d72e9c32fe67b4fbd4b829e308f50b74eb8",
+      "answerSha256": "76e4879bd0bba089eced499101637de8c63160a2efe0ebcff143d0afd743b93d",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "historical-typed",
+      "caseId": "q17",
+      "trial": 1,
+      "rawSha256": "90dde9b1a756d2ddf3aa10922aa064056a6b4d76cf6bd2f6a60165e9bb1f410a",
+      "answerSha256": "1389e31989129897298c54b269bc6944f8fcda417c2b5f5268a56d65b3f05dcd",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "historical-typed",
+      "caseId": "q18",
+      "trial": 1,
+      "rawSha256": "4ba2ba108bf30b86f11f287d917b7ffa8f4c95adcedb3e9ac59d1e5471cef39c",
+      "answerSha256": "d4fc989b675eb8d4a6506a0b263afbbbd7b81c152762bb8448f008f5f3a3e032",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "historical-typed",
+      "caseId": "q08",
+      "trial": 2,
+      "rawSha256": "c0e03264a24d8a5d8d6e4252cded35dd35d9a3c593d796a8ac947ea4b70f6401",
+      "answerSha256": "6ae913d3305a24a0d262bc488198cae9525c969fee80f1a99cd59d29dc84d3eb",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "historical-typed",
+      "caseId": "q09",
+      "trial": 2,
+      "rawSha256": "0392b0ce86a26b30498e27ba05c8039f6e8950114935b428da7cddd61f108154",
+      "answerSha256": "36899bac03ec481d1d6a69cbc0daf25ab383d6428de42637ba8d8972cd97fcf0",
+      "lexicalPass": false,
+      "prosePass": false,
+      "reason": "Substitutes the runbook name for an absent backup-instance ID."
+    },
+    {
+      "condition": "historical-typed",
+      "caseId": "q11",
+      "trial": 2,
+      "rawSha256": "73786a6d0d14127b413a305aa47a4207d29f1123624598724d02161a72767c9b",
+      "answerSha256": "f82b81cd324c92874b4d553ee3fe2047fb2456f93b4d8a0b9a06ab9848f04d20",
+      "lexicalPass": false,
+      "prosePass": false,
+      "reason": "Declares both explicitly supplied maintenance fields unknown."
+    },
+    {
+      "condition": "historical-typed",
+      "caseId": "q08",
+      "trial": 3,
+      "rawSha256": "79a9838574d6f242024480bc21ae11bb8bc569c7459fdc58fd624d1cee33f037",
+      "answerSha256": "7db6885467b9a3f3dba53ccced727e78d38aad67c2705870357495554280ebd0",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "historical-typed",
+      "caseId": "q09",
+      "trial": 3,
+      "rawSha256": "aa6acc302a3c04cfdac6f81d8366e908ead4fecbc2eb7c31c27e881fc66d89d5",
+      "answerSha256": "ee536dff3abadb64ffc4bcaa43c994760effed506678cc5eb9081ff763d4ae8e",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "historical-typed",
+      "caseId": "q11",
+      "trial": 3,
+      "rawSha256": "8d87b35390214485ab497d507b6b5848ca770cde59bd3d98d1ce9f200eefe905",
+      "answerSha256": "ac7c51391d3ba22dd4d5c48ebfc43585c2c6fe8606f5650fe419e7ee032caf44",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "latest-generic",
+      "caseId": "q08",
+      "trial": 1,
+      "rawSha256": "159dfca0483f5d3c119dc775c06050ce4c2a6c236fcc733569d6106847f2d984",
+      "answerSha256": "8ab9d02e33f92b2943e00593c7293c36585ff4545379f93770365383686decc9",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "latest-generic",
+      "caseId": "q09",
+      "trial": 1,
+      "rawSha256": "82ec7ad2ef7a2c0d0ae71c66a0451356269c8f81168435e4457432c21725fe1e",
+      "answerSha256": "acad2c13bb599de133ed96597f15c1323b696225ad7f96b9daf466e410a2a3f2",
+      "lexicalPass": false,
+      "prosePass": false,
+      "reason": "Substitutes the runbook name for an absent backup-instance ID."
+    },
+    {
+      "condition": "latest-generic",
+      "caseId": "q11",
+      "trial": 1,
+      "rawSha256": "d74e4917104bfe6f582502bd8e0abe34663db2f91ec3923ddc9d7fabf912615e",
+      "answerSha256": "ac7c51391d3ba22dd4d5c48ebfc43585c2c6fe8606f5650fe419e7ee032caf44",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "latest-generic",
+      "caseId": "q17",
+      "trial": 1,
+      "rawSha256": "703ce9f76e6c2fa1e1f9be2d7731e6a65528f0c3aac68ac3d7b8afc49eecf075",
+      "answerSha256": "122e35bfbacbcf7cd70cff974fec8e3b639589f15b01dd526226e3d2e93d6e4e",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "latest-generic",
+      "caseId": "q18",
+      "trial": 1,
+      "rawSha256": "49b10e5ffd52e2736f739c25cdbd3a35486d1730cb971937a1a929272a474b21",
+      "answerSha256": "d4fc989b675eb8d4a6506a0b263afbbbd7b81c152762bb8448f008f5f3a3e032",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "latest-generic",
+      "caseId": "q08",
+      "trial": 2,
+      "rawSha256": "9ebc5b3057956662618455fd864dffdf6a2aaa45882be581978ecc22b8dc2b49",
+      "answerSha256": "c11ce3c0fd74e283d4aef7b4546b6521ba49ba41b397391dfab21b97e25345cf",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "latest-generic",
+      "caseId": "q09",
+      "trial": 2,
+      "rawSha256": "3cbe89580b6f3f7d8a8123b6f01bd9cde6419464accce34383abc342a452f462",
+      "answerSha256": "c12f5ee4d79d786de8f658268d531c32a9889a1d0287e0a7f6f5faa358f0506a",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "latest-generic",
+      "caseId": "q11",
+      "trial": 2,
+      "rawSha256": "24ea94c3fa5f802fb8426f683d0c20bea9b3bdf71eb5ffc9e71dd27b1141b545",
+      "answerSha256": "9afa1f548c2eee1c5288d2dde7d3f5cac18cf3294b3e9bfd0353573bb996c012",
+      "lexicalPass": false,
+      "prosePass": true,
+      "reason": "14 h50 is semantically equivalent to14:50; frozen lexical rubric misses this spelling. The answer is grounded in the latest supplied record."
+    },
+    {
+      "condition": "latest-generic",
+      "caseId": "q08",
+      "trial": 3,
+      "rawSha256": "1351d708da0830bbeddc7e136faf61a812d4a1a0cda77ba9cbff8547207c63e0",
+      "answerSha256": "10df9d174f91a616c50e47a60b74a0fa4c3696811edce335b2a6a3407053ae17",
+      "lexicalPass": false,
+      "prosePass": false,
+      "reason": "Omits the explicitly supplied corrected retention11."
+    },
+    {
+      "condition": "latest-generic",
+      "caseId": "q09",
+      "trial": 3,
+      "rawSha256": "51053cbf7e5f9e6b11765964c2b1faa9cb05e057e0a13ef15e34faac106b7834",
+      "answerSha256": "69324bb60818b341cfab74f08c22da9d272d790a1c2dd9e3078b6a520245cb9e",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "latest-generic",
+      "caseId": "q11",
+      "trial": 3,
+      "rawSha256": "2e74ff9474cf987abbff526b997500130ae8114cf1088d1de6f81d8fb4850388",
+      "answerSha256": "ac7c51391d3ba22dd4d5c48ebfc43585c2c6fe8606f5650fe419e7ee032caf44",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "latest-typed",
+      "caseId": "q08",
+      "trial": 1,
+      "rawSha256": "ba093d1689ea0d78b26b301fd22071b78d51b99de9da69306b127bb4db01360f",
+      "answerSha256": "253223fe83cb996cc29764d1700edc9674b20e7a3e3c708f3e4c57a27bd93781",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "latest-typed",
+      "caseId": "q09",
+      "trial": 1,
+      "rawSha256": "e3780f0f2c0e032be841741ce04b96ef0c06e5313640f3f2e28beb8d77b9f9c5",
+      "answerSha256": "36899bac03ec481d1d6a69cbc0daf25ab383d6428de42637ba8d8972cd97fcf0",
+      "lexicalPass": false,
+      "prosePass": false,
+      "reason": "Substitutes the runbook name for an absent backup-instance ID."
+    },
+    {
+      "condition": "latest-typed",
+      "caseId": "q11",
+      "trial": 1,
+      "rawSha256": "0b96c1a83c264d27148c478e28856661edb75f0054911a3a86ce1f2d46e83ca0",
+      "answerSha256": "fdda36c99342721cec8a3f62ed53159496e4588b006fb2c1a08dad1dc86cd051",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "latest-typed",
+      "caseId": "q17",
+      "trial": 1,
+      "rawSha256": "f36d234f3a23d96b934b5b302a1b51019e969202411c6b8e4246a680e5458e80",
+      "answerSha256": "401462e0b56e7c6fcee78e77393deaf0013cf972b6f888af7cf503ae2f0ab3fc",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "latest-typed",
+      "caseId": "q18",
+      "trial": 1,
+      "rawSha256": "48c95fcf9e8a16730e406a9b0e4d09e398976a392fd252e5474ddf8fd1b58835",
+      "answerSha256": "43ee892f48b0be9662242a5bca07a7f5241c4961c298390ffaad3aa6d7289428",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "latest-typed",
+      "caseId": "q08",
+      "trial": 2,
+      "rawSha256": "1904e071e9f6a7ba76b5e5f3d9bc207c302f130a730450b1ab4db420316059bc",
+      "answerSha256": "253223fe83cb996cc29764d1700edc9674b20e7a3e3c708f3e4c57a27bd93781",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "latest-typed",
+      "caseId": "q09",
+      "trial": 2,
+      "rawSha256": "8c85d12a902f01432907d4933516694977a15a1ab43d9943e37d5193b55b9e6c",
+      "answerSha256": "a4e61ff0c207c19f9863586f66ffed72d9c5a7c9df7ed9dbce67c7925f0ab8a8",
+      "lexicalPass": false,
+      "prosePass": false,
+      "reason": "Substitutes the runbook name for an absent backup-instance ID."
+    },
+    {
+      "condition": "latest-typed",
+      "caseId": "q11",
+      "trial": 2,
+      "rawSha256": "fc15c4f942744ccd7c7247ffdbc81ba71c7b6153666ecc7ed72f3555333190da",
+      "answerSha256": "a292fbae5f814bab9bca63ddfad40a0517133d34835c9080394bb2f3b0e56286",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "latest-typed",
+      "caseId": "q08",
+      "trial": 3,
+      "rawSha256": "1bc85b5f40b0c9d016f9da2baf09c3579ad031b28d0922a37c1aedf7b37a9210",
+      "answerSha256": "10df9d174f91a616c50e47a60b74a0fa4c3696811edce335b2a6a3407053ae17",
+      "lexicalPass": false,
+      "prosePass": false,
+      "reason": "Omits the explicitly supplied corrected retention11."
+    },
+    {
+      "condition": "latest-typed",
+      "caseId": "q09",
+      "trial": 3,
+      "rawSha256": "121c32da2e4eaa1a254868302484c5d37ebd96a43a3a1e779aeb875c440ea449",
+      "answerSha256": "31eca5de6846bbb4ecae1827876f47a78fe1a0179bb810b81936bfa08ad959c7",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    },
+    {
+      "condition": "latest-typed",
+      "caseId": "q11",
+      "trial": 3,
+      "rawSha256": "12ef8e22dbc53219765573545feb3069d768de64463e2c84880d91ed5e03235c",
+      "answerSha256": "a77ccf8849d4e49832d56023d7e80b67129cb6c655d41121fa4c11769f6cee63",
+      "lexicalPass": true,
+      "prosePass": true,
+      "reason": "All requested fields supplied without observed unsupported additions, or correct abstention for an absent field."
+    }
+  ],
+  "prosePassed": 31,
+  "total": 44,
+  "latestTypedPassed": 8,
+  "latestTypedTotal": 11,
+  "candidateAccepted": false,
+  "decision": "Reject latest-typed. q08 omission and q09 substitutions persist. No Memory production change is supported by this diagnostic.",
+  "causalLimit": "A31/44 finite prose count does not establish causal factor effects or global quality. The policy remains inside the historical-data heading; independent placement is untested.",
+  "next": "One predeclared boundary probe moves only the original fixed prefix outside quoted JSON. No further generic wording tune is warranted if that probe fails."
+}

@@ -361,6 +361,16 @@
       "title": "Resumable Memory qualification implementation plan"
     },
     {
+      "authorityClass": "planning",
+      "docKind": "planning",
+      "freshness": "unknown",
+      "path": "docs/plans/memory-recall-quality-fixes.md",
+      "sourceOfTruth": "planning-non-canon",
+      "status": "active",
+      "summary": "Goal: correct the retrieval failure found by the 23 October controlled session",
+      "title": "Memory recall quality corrections"
+    },
+    {
       "authorityClass": "other",
       "docKind": "generated",
       "freshness": "unknown",
@@ -594,6 +604,7 @@
     "docs/architecture/README.md",
     "docs/plans/automation-portability-handoff.md",
     "docs/plans/memory-qualification.md",
+    "docs/plans/memory-recall-quality-fixes.md",
     "docs/roadmaps/observation-substrate-roadmap.md",
     "docs/research/historical-monetization-infrastructure.md",
     "docs/research/openclaw-orchestration-gap-roadmap.md",

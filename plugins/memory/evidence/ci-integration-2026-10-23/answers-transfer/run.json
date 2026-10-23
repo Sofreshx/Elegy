@@ -1,0 +1,783 @@
+{
+  "schemaVersion": "memory-generic-answers/v1",
+  "status": "execution-valid",
+  "startedAt": "2026-10-23T13:36:36.423529+00:00",
+  "protocolSha256": "1f42dfc566ce2d2cf525ddb0021fb3fc9da8ee845fb78306b2ad74efddbd6a76",
+  "corpusSha256": "6987ed6bb624648d73dad0272de3d602c47b20af5b868017a76aaa4b06a7e893",
+  "runnerSha256": "0af3c61bd27151e9b2e2d8c2a92b8925411f35cdc0e548a747576dc9dd045c30",
+  "answerRunnerSha256": "9bd417a00518bccc0d61e75908996e0bdc80b62db9a6b96e8e278f831994ae0b",
+  "runReplaySha256": "1581b08a921e4dca1bec1207ceed384d883f6061319c3edc519d25a97eed4d1f",
+  "gradeSha256": "bf330b80fa97bc734f73e4a8c3c9257201ba12fb0ecbc52277b2e46bbb78cf54",
+  "rpcSupportSha256": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759",
+  "replayRunSha256": "6c3182b8ed77c07ffee7f61c3d3d79003d57c86440457ed9adcaef9316803e19",
+  "configuration": {
+    "argv": [
+      "<codex>",
+      "exec",
+      "--ignore-user-config",
+      "--ephemeral",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "--json",
+      "-C",
+      "<scratch-case>",
+      "-m",
+      "gpt-6.1-sol",
+      "-c",
+      "model_reasoning_effort=\"max\"",
+      "-c",
+      "project_doc_max_bytes=0",
+      "-"
+    ],
+    "executableSha256": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+    "environment": "API keys/endpoints/Memory bindings removed; existing ChatGPT login only"
+  },
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "codexSha256": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+  "codexVersion": "codex-cli 0.163.0-alpha.11",
+  "clientSha256Before": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+  "ordinaryChatGPTAuth": true,
+  "paidApiCalls": 0,
+  "records": [
+    {
+      "caseId": "h01",
+      "arm": "without",
+      "answer": "Le runbook de la sauvegarde Nacre n’est pas disponible dans les données fournies. Sa rétention en jours est inconnue.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "BACKUP_LIME"
+        ],
+        [
+          "23"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fa-4e30-7f61-9377-a63a84dc276a",
+      "rawPath": "raw/h01_without.json",
+      "rawSha256": "cb56f25c907adeedea98c25313aaade75cf8a90f73ce9688f06dbfef76fb368d",
+      "promptSha256": "5a872b2b1d388d9e754ad1a25d550cc5880f2ba04121fe8594717b0f08cbd13f",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26317,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 271,
+        "reasoning_output_tokens": 237
+      },
+      "elapsedMs": 14972.781
+    },
+    {
+      "caseId": "h01",
+      "arm": "with",
+      "answer": "La sauvegarde Nacre utilise le runbook `BACKUP_LIME`, avec une rétention de 23 jours.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fa-8849-7ef1-bf85-56c797d442a1",
+      "rawPath": "raw/h01_with.json",
+      "rawSha256": "63c61b0a4b146ab5a8214047189687b8fe3fb07e63b544a5fb8c9e9f4b8d8e60",
+      "promptSha256": "c4818d44838c10439288bb4094afcd366188fe8a49712fb43ffc5df43e68e96a",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "956a01f434f69bce3f1596a86c68c995f4bb681b9aeb572c2ca09e2ee26af28c",
+      "usage": {
+        "input_tokens": 26497,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 161,
+        "reasoning_output_tokens": 131
+      },
+      "elapsedMs": 10617.723
+    },
+    {
+      "caseId": "h02",
+      "arm": "with",
+      "answer": "Pour Nacre, le runbook est `BACKUP_LIME` et la rétention est de **9 jours**.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fa-4e07-7593-b338-63c000828ecd",
+      "rawPath": "raw/h02_with.json",
+      "rawSha256": "7cbfc5be78928e1855b00a49368431b083dee2c9f93e2073b3e2d2febfa16bbe",
+      "promptSha256": "ac15ef93c30c83f669584ce8ea64dabf408923f620e26fa82cd198cf85eef19b",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "d99cce5b638b6418c6bfce459f136e0454d77e691afd1678a50d1e6c27fcd42c",
+      "usage": {
+        "input_tokens": 26499,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 177,
+        "reasoning_output_tokens": 146
+      },
+      "elapsedMs": 11861.061
+    },
+    {
+      "caseId": "h02",
+      "arm": "without",
+      "answer": "Les valeurs à transmettre pour le runbook et la rétention après la correction Nacre sont inconnues : aucune donnée historique n’a été fournie.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "BACKUP_LIME"
+        ],
+        [
+          "9"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fa-7c16-7ac2-b839-1160873d0e8e",
+      "rawPath": "raw/h02_without.json",
+      "rawSha256": "3c183b5ceb210156fc24ede130de8226d46b2303d0d04a2893755f6b1fc91d10",
+      "promptSha256": "2a247bd611588f4b0ade67e8b6a33b4e9eee5a4b77c6e8c74d285fe7db8910b3",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26316,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 350,
+        "reasoning_output_tokens": 314
+      },
+      "elapsedMs": 16579.091
+    },
+    {
+      "caseId": "h03",
+      "arm": "without",
+      "answer": "L’identifiant exact du snapshot à restaurer pour Nacre n’est pas disponible dans les données fournies.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fa-4e2d-79d0-b3ce-cc204995a0b3",
+      "rawPath": "raw/h03_without.json",
+      "rawSha256": "f517aa30fb26cec18631e19fa44429a9724205ce722f8d15ec6ec75940fb40e9",
+      "promptSha256": "2142c4ac1dac044fc90dd0ade6768f858a6b6b217e01ff697fccd4f54b70736a",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 27164,
+        "cached_input_tokens": 7296,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 182,
+        "reasoning_output_tokens": 154
+      },
+      "elapsedMs": 16433.594
+    },
+    {
+      "caseId": "h03",
+      "arm": "with",
+      "answer": "L’identifiant exact du snapshot Nacre à restaurer est inconnu dans les données fournies.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fa-8df5-73c1-af15-652d28ab0cc7",
+      "rawPath": "raw/h03_with.json",
+      "rawSha256": "cd63b8bc25d5f271d8b87780d4e7833bb53d14105f5a0f4f4c1dfbc4e07d2891",
+      "promptSha256": "015ae0d32b5dc9769a3c04ef1fee8844c395163524cb0b333727fa894c9369dd",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "a20f62d8a1385607f37230a5b574cfe7df2db2442479541f681ae40db1531ab7",
+      "usage": {
+        "input_tokens": 26497,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 184,
+        "reasoning_output_tokens": 158
+      },
+      "elapsedMs": 13874.251
+    },
+    {
+      "caseId": "h04",
+      "arm": "with",
+      "answer": "La maintenance Quartz débute à 03:25 UTC. Le groupe d’escalade est OPS_JADE.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fa-b1cb-7780-8a71-d26b95c72b5c",
+      "rawPath": "raw/h04_with.json",
+      "rawSha256": "47274f4334b677190556725b412d5b90436f4e67a351293f1156ad652364a1f5",
+      "promptSha256": "e3d581c21ec9dcfb88362d2d0fc30dce3af6652163aa54baf9d007dab84bdabd",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "aec4a23148aceac9f27a35d96a6a9d8d666713551440357bc769bf8d9f860850",
+      "usage": {
+        "input_tokens": 26503,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 130,
+        "reasoning_output_tokens": 101
+      },
+      "elapsedMs": 11934.246
+    },
+    {
+      "caseId": "h04",
+      "arm": "without",
+      "answer": "Le début de maintenance en UTC et le groupe d’escalade du planning Quartz ne sont pas disponibles dans les données fournies.",
+      "score": 0.3333333333333333,
+      "missingGroups": [
+        [
+          "03:25"
+        ],
+        [
+          "OPS_JADE"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fa-e07d-7261-88d5-3cd4f3cb9a19",
+      "rawPath": "raw/h04_without.json",
+      "rawSha256": "3aad316b9a14026ffc4808d3563f29c163b4337dc85fef720d93e6f5f774e467",
+      "promptSha256": "1f36e9d4efb9fa2c477918d6118203b3b01a06504b466106a622cb92cdf053b6",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26315,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 245,
+        "reasoning_output_tokens": 213
+      },
+      "elapsedMs": 13335.762
+    },
+    {
+      "caseId": "h06",
+      "arm": "with",
+      "answer": "Aucune cause racine de Quartz n’est attestée dans les données fournies. Le diagnostic n’étant pas disponible, je m’abstiens.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fa-c44d-7571-954d-91fd437aea86",
+      "rawPath": "raw/h06_with.json",
+      "rawSha256": "4c49ead1403ca6d9cdbfcddf2cc5dbf6ab95096514c00664690d4d61d451c5ec",
+      "promptSha256": "aa24315a4eb873968c6687c6a55adf9694ddd03d20ac6b75f139ae4c2c47fba3",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e9da95474615a198a7a7061afc583e18d7be5082d61ee331d868a7bdc8769973",
+      "usage": {
+        "input_tokens": 26508,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 311,
+        "reasoning_output_tokens": 274
+      },
+      "elapsedMs": 14254.217
+    },
+    {
+      "caseId": "h06",
+      "arm": "without",
+      "answer": "Aucune cause racine de Quartz ne peut être attestée : aucun diagnostic n’est fourni.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "inconnu",
+          "inconnue",
+          "pas renseign",
+          "pas indiqu",
+          "pas disponible",
+          "ne sais pas",
+          "non document",
+          "non fourni",
+          "aucune information",
+          "impossible de déterminer",
+          "pas renseigné",
+          "pas renseignée",
+          "pas indiqué",
+          "pas indiquée",
+          "non documenté",
+          "non documentée",
+          "non fourni",
+          "non fournie",
+          "pas documenté",
+          "pas documentée",
+          "pas fourni",
+          "pas fournie",
+          "non disponible",
+          "pas accessible",
+          "ne figure pas",
+          "aucune donnée",
+          "je ne dispose pas",
+          "je n'ai pas",
+          "n'apparaît pas",
+          "aucun élément",
+          "non communiqué",
+          "non communiquée",
+          "pas communiqué",
+          "pas communiquée"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fa-fbfe-79d1-bede-eb08797d1e7d",
+      "rawPath": "raw/h06_without.json",
+      "rawSha256": "687eee5e09b8e8ced632b0cd38688386f507fbe8c33fe380201ce3d2df6078d1",
+      "promptSha256": "ce1576f4a81154da08889be25579972b227480fa18bc798cf8131bc7307d0c56",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26313,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 190,
+        "reasoning_output_tokens": 165
+      },
+      "elapsedMs": 12001.036
+    },
+    {
+      "caseId": "h05",
+      "arm": "without",
+      "answer": "Le début de maintenance UTC et le groupe à retenir après la mise à jour de Quartz sont inconnus : aucune donnée historique n’est fournie.",
+      "score": 0.3333333333333333,
+      "missingGroups": [
+        [
+          "03:55"
+        ],
+        [
+          "OPS_JADE"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fa-bcf3-7743-a0a4-5dca1c823057",
+      "rawPath": "raw/h05_without.json",
+      "rawSha256": "887eb7c9d3af4f4ba5a9fb627b64b4bb4892f9ecacc04095e4013131b6b7d72d",
+      "promptSha256": "c7d3a21016d69089f6d5fdd492ffbeafbaa0d68ab93ac4bfea548e02651ffe31",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26314,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 350,
+        "reasoning_output_tokens": 315
+      },
+      "elapsedMs": 17971.94
+    },
+    {
+      "caseId": "h05",
+      "arm": "with",
+      "answer": "Pour Quartz, le début de maintenance à retenir est 03:55 UTC et le groupe d’escalade est OPS_JADE.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fb-0336-7de2-913f-eb490f779d9e",
+      "rawPath": "raw/h05_with.json",
+      "rawSha256": "34fb505c80b9ab6feda8cc2615754935c459eafdfeafbaac83633bca397208d4",
+      "promptSha256": "c18c798e384aced7956af4e8a45bda55efaa3c5860111cb768fad8941641fc11",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "06f8044969e5c384e93836bb080b3075e4e5c4c21881b6c652415aa405490ec3",
+      "usage": {
+        "input_tokens": 26502,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 218,
+        "reasoning_output_tokens": 185
+      },
+      "elapsedMs": 12699.393
+    },
+    {
+      "caseId": "h07",
+      "arm": "without",
+      "answer": "La durée du cache et le nom de la stratégie anti-rejeu des paiements Brume ne sont pas renseignés dans les données fournies.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "84"
+        ],
+        [
+          "REPLAY_WILLOW"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fb-14b2-7800-85f6-5754d07f58df",
+      "rawPath": "raw/h07_without.json",
+      "rawSha256": "16e9c068aafa3bba26acaffcf45188fdc9cff2db69361e79bfef41b8226cde3c",
+      "promptSha256": "4cf2ab8f1fee45ff9e83cdde0a728581d21142e7d8a9526eae7f8f021dcd2574",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26316,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 236,
+        "reasoning_output_tokens": 201
+      },
+      "elapsedMs": 14802.828
+    },
+    {
+      "caseId": "h07",
+      "arm": "with",
+      "answer": "Durée du cache anti-rejeu des paiements Brume : **84 minutes**. Stratégie de déduplication : **REPLAY_WILLOW**.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fb-4eb2-71c0-a677-779bedbbdda2",
+      "rawPath": "raw/h07_with.json",
+      "rawSha256": "4775086b43de7fcf08fda89464a14cc6997e355a6b051346b2068548c93a6b8a",
+      "promptSha256": "968f76eaa844fe223f03b28d59fb2fc818971acc506ea77b189550f2b13e58d7",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "97849cc4be95a7e110c9aa74116ddfac49bd00879db86e3ce19e5ff12fc64391",
+      "usage": {
+        "input_tokens": 26509,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 196,
+        "reasoning_output_tokens": 156
+      },
+      "elapsedMs": 13553.926
+    },
+    {
+      "caseId": "h09",
+      "arm": "without",
+      "answer": "Pour Brume, la durée de conservation des traces anti-rejeu et le nom du mécanisme sont inconnus : aucune donnée historique n’est fournie.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "68"
+        ],
+        [
+          "REPLAY_WILLOW"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fb-34e7-7ae3-8c4f-8fb4ae0deb71",
+      "rawPath": "raw/h09_without.json",
+      "rawSha256": "199d0070d2c4c9c0a2cbc72418d4089f11554db5b77a3baf22775f6c7d356985",
+      "promptSha256": "4002905ebbe201bbc37cb6995dcfb22844018fda5497afbf07b8691f6cedae88",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26319,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 240,
+        "reasoning_output_tokens": 203
+      },
+      "elapsedMs": 12524.481
+    },
+    {
+      "caseId": "h09",
+      "arm": "with",
+      "answer": "Pour Brume, garde les traces anti-rejeu pendant **68 minutes**, avec le mécanisme **REPLAY_WILLOW**.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fb-65f2-7f82-a6e7-10a0800daed5",
+      "rawPath": "raw/h09_with.json",
+      "rawSha256": "18d4e991b5a527b7a0f5c2195283c8eccaeb538ad88cabd249ddb107667b7342",
+      "promptSha256": "377f09fdf26ee85fe2ab684b9af1d086ea311e2845644e5227ecdccaa581242d",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "eb12c66e9c4ed2e6e0f6c51803d292cf341fc2c386992fe9a8d22ee2af16834d",
+      "usage": {
+        "input_tokens": 26511,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 228,
+        "reasoning_output_tokens": 195
+      },
+      "elapsedMs": 13375.463
+    },
+    {
+      "caseId": "h08",
+      "arm": "with",
+      "answer": "Pour Brume, la durée de cache à appliquer est de 68 minutes et la stratégie est REPLAY_WILLOW.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fb-2b02-7a32-aede-0f79c839cc84",
+      "rawPath": "raw/h08_with.json",
+      "rawSha256": "e69755c76e79824ca90ce1146a723416383a4e0e42dc52b0ccf4777ed3e6523a",
+      "promptSha256": "f7adeac1853e1146a8687d477f58a64957849df0d1b17695d3a26343f719f000",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "2b5d3d7cd94bfbe546ac8f460a5898022451a90cfcf3c3451e61a84092386406",
+      "usage": {
+        "input_tokens": 26503,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 172,
+        "reasoning_output_tokens": 141
+      },
+      "elapsedMs": 16883.417
+    },
+    {
+      "caseId": "h08",
+      "arm": "without",
+      "answer": "La durée de cache et la stratégie à appliquer à Brume après correction sont inconnues : aucune donnée historique n’est fournie.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "68"
+        ],
+        [
+          "REPLAY_WILLOW"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fb-6d0d-7560-9dfa-9b0f4d6b2617",
+      "rawPath": "raw/h08_without.json",
+      "rawSha256": "4686a8024f1865d86d704a98d531ac8cf5547a69c6909d9b86ddedc03d889320",
+      "promptSha256": "e18b23b405f440e7dfb6e6415fee14cfd4f99431f89fc8803a7d1e100161de73",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26312,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 241,
+        "reasoning_output_tokens": 209
+      },
+      "elapsedMs": 12627.558
+    },
+    {
+      "caseId": "h10",
+      "arm": "with",
+      "answer": "Mistral expédie 7 × 3 = **21 caisses au total**.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fb-836f-79a2-9f00-30f38180164b",
+      "rawPath": "raw/h10_with.json",
+      "rawSha256": "b9061080269242585cd52641f45401035cb12136e434157f4875ac9e409749f0",
+      "promptSha256": "818052ebf1e05da69ee041633c7d24f9595455516585eaa0ef74f60e57500b3d",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "4625999f2e9e1e9f6beaa8e1d5431564be72ba2b3f3964a2f67c450d1433aa8e",
+      "usage": {
+        "input_tokens": 26509,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 119,
+        "reasoning_output_tokens": 94
+      },
+      "elapsedMs": 11060.933
+    },
+    {
+      "caseId": "h10",
+      "arm": "without",
+      "answer": "Mistral expédie 7 × 3 = **21 caisses** au total.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fb-aec1-7c30-9d18-bff8a8458831",
+      "rawPath": "raw/h10_without.json",
+      "rawSha256": "203ef919b86967eb026fa990ea19f528c66b7986938ac95a2a749c6cc483190f",
+      "promptSha256": "15148d4d98c81e2c461e47eb121136ec41d18c07ee09567915ef2e1dab8e1cd0",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26322,
+        "cached_input_tokens": 7296,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 114,
+        "reasoning_output_tokens": 89
+      },
+      "elapsedMs": 9665.735
+    },
+    {
+      "caseId": "h11",
+      "arm": "without",
+      "answer": "Appliquer le label BAG_SILVER pour cet envoi seulement.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fb-9a42-77a2-a3e9-9898936e140f",
+      "rawPath": "raw/h11_without.json",
+      "rawSha256": "d2498ab26bd65ad679deab31fd3b1db3cb3c70e0df492ed047989b03dcaac6c0",
+      "promptSha256": "599f6b1bedfcb96fbcddb76b97f10b5b87ef987dc538f74d3bb9856e61cbd69d",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26317,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 174,
+        "reasoning_output_tokens": 154
+      },
+      "elapsedMs": 12329.207
+    },
+    {
+      "caseId": "h11",
+      "arm": "with",
+      "answer": "Pour cet envoi Mistral uniquement, appliquez le label BAG_SILVER.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fb-ca4e-7103-b19e-8b0f2cccafd3",
+      "rawPath": "raw/h11_with.json",
+      "rawSha256": "ec6b3e3ee68d532657cbf1946b1b7faf451bf7d4759a93ee497e590f52a429b4",
+      "promptSha256": "4c2041f37739994052ec5e0b50eb4e1db115eefd1130a79a5984f1e1711f0bbf",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "55abc251473b8d70a8e2dfe8097e48617030bd8a9b1329444b068f13345b487c",
+      "usage": {
+        "input_tokens": 26502,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 128,
+        "reasoning_output_tokens": 104
+      },
+      "elapsedMs": 11748.152
+    },
+    {
+      "caseId": "h12",
+      "arm": "with",
+      "answer": "Aucun label antérieur n’est disponible dans les données fournies.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "inconnu",
+          "inconnue",
+          "pas renseign",
+          "pas indiqu",
+          "pas disponible",
+          "ne sais pas",
+          "non document",
+          "non fourni",
+          "aucune information",
+          "impossible de déterminer",
+          "pas renseigné",
+          "pas renseignée",
+          "pas indiqué",
+          "pas indiquée",
+          "non documenté",
+          "non documentée",
+          "non fourni",
+          "non fournie",
+          "pas documenté",
+          "pas documentée",
+          "pas fourni",
+          "pas fournie",
+          "non disponible",
+          "pas accessible",
+          "ne figure pas",
+          "aucune donnée",
+          "je ne dispose pas",
+          "je n'ai pas",
+          "n'apparaît pas",
+          "aucun élément",
+          "non communiqué",
+          "non communiquée",
+          "pas communiqué",
+          "pas communiquée"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fb-9e88-7a80-92f0-d0030d982d4d",
+      "rawPath": "raw/h12_with.json",
+      "rawSha256": "27e786676e1a0b9d8fcf4416bdd4ff3e8f529dc2a37ae598bed8413bbe88aa56",
+      "promptSha256": "50668d41c3889f8a0ccc43c578d20abc40a9b098a0c95ce3c216a5e98caf7d56",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26317,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 196,
+        "reasoning_output_tokens": 176
+      },
+      "elapsedMs": 13041.498
+    },
+    {
+      "caseId": "h12",
+      "arm": "without",
+      "answer": "Aucun label antérieur n’est disponible dans les données fournies.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "inconnu",
+          "inconnue",
+          "pas renseign",
+          "pas indiqu",
+          "pas disponible",
+          "ne sais pas",
+          "non document",
+          "non fourni",
+          "aucune information",
+          "impossible de déterminer",
+          "pas renseigné",
+          "pas renseignée",
+          "pas indiqué",
+          "pas indiquée",
+          "non documenté",
+          "non documentée",
+          "non fourni",
+          "non fournie",
+          "pas documenté",
+          "pas documentée",
+          "pas fourni",
+          "pas fournie",
+          "non disponible",
+          "pas accessible",
+          "ne figure pas",
+          "aucune donnée",
+          "je ne dispose pas",
+          "je n'ai pas",
+          "n'apparaît pas",
+          "aucun élément",
+          "non communiqué",
+          "non communiquée",
+          "pas communiqué",
+          "pas communiquée"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a168fb-d199-7f01-9924-88f65a5ef759",
+      "rawPath": "raw/h12_without.json",
+      "rawSha256": "21e2c63b57c7b191f662f774edce7a44cadca16dead8e9d5b54850070acc2c36",
+      "promptSha256": "50668d41c3889f8a0ccc43c578d20abc40a9b098a0c95ce3c216a5e98caf7d56",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26317,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 238,
+        "reasoning_output_tokens": 218
+      },
+      "elapsedMs": 14736.143
+    }
+  ],
+  "errors": [],
+  "clientSha256After": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+  "completedAt": "2026-10-23T13:38:31.545459+00:00"
+}

@@ -1,0 +1,36 @@
+{
+  "argv": [
+    "pwsh",
+    "-NoProfile",
+    "-File",
+    "scripts/test-check-repo-shape.ps1"
+  ],
+  "exitCode": 0,
+  "durationSeconds": 8.562,
+  "log": "repo-shape-final.log",
+  "logSha256": "3f18f9a16fc6fe5661b62cd1cfdf69c0c71452e46436e9d495c94d946ff5a0a9",
+  "checkerSha256": "2de1ca4216e5cc7d32fd389d16a501a4ca7ba9f29c5aed4cd9d1be52ef17143a",
+  "testSha256": "97f8b64b5db3378d43dff058698ab05bc9b2773f73ac088e89d1e7e9ad72a1c2",
+  "tests": [
+    "empty tracked file accepted",
+    "ordinary text accepted",
+    "local path rejected",
+    "simulated unreadable file rejected without details"
+  ],
+  "readFailureRed": {
+    "exitCode": 1,
+    "log": "repo-shape-readfailure-red.log",
+    "logSha256": "0d23167365a34e6ca3057753693021a354317b8c9e8587ded4bc8f3e66b6200f",
+    "sourceRecipe": "Git a753b4b:scripts/check-repo-shape.ps1 with only the original Get-Content expression wrapped in [string](...). SilentlyContinue remains; injected read failure produces no content.unreadable issue.",
+    "rawLogSha256": "e7793c30d736a1c8d90bb587fa498385b8d8bdfd9e3d7dfc33f056dab0986a20",
+    "publicTransform": {
+      "script": "../sanitize_evidence.py",
+      "scriptSha256": "17b5048e26043444f59c68e561e97c29b5c86fb92ad969e3a8f51e138e05df29",
+      "replacementCounts": {
+        "windows_absolute_path": 1,
+        "neutralized_appdata_fragment": 0
+      },
+      "retained": "Error messages, line count, exit code and test assertion remain; workspace paths become neutral placeholders. Original local capture remains in ignored runtime."
+    }
+  }
+}

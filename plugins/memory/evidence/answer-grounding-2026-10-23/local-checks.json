@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "memory-diagnostic-local-checks/v1",
+  "observedAt": "2026-10-23T07:16:08.850343+00:00",
+  "productionSourceChanged": false,
+  "priorEvidence": {
+    "command": [
+      "<python>",
+      "../recall-fixes-2026-10-23/verify_evidence.py"
+    ],
+    "exitCode": 0,
+    "status": "passed-evidence-checks",
+    "productAcceptanceStillBlocked": true,
+    "subjectSha256": "6910f9495d474b8ff36c6a2ccd1861cdbc13a60f6d3cb9b74f09b0b0eba94c54",
+    "sourceLockSha256": "6c27a0c675ec6d642fc92535c64ca6f0ce897849bf21f7d2b08d00f003c525fe",
+    "evidenceManifestSha256": "7efeed1d07143f046adbbf1e17c0339f26e8e347b1f066524cd66d533778d087"
+  },
+  "checkerUnitTests": {
+    "command": [
+      "<python>",
+      "-m",
+      "unittest",
+      "test_verify_diagnostics",
+      "-v"
+    ],
+    "exitCode": 0,
+    "tests": 8,
+    "sourceSha256": {
+      "verify_diagnostics.py": "94f4c71af1675c3fb03049bee2e7ac5349ef888551e2dc0a81834143308b403b",
+      "test_verify_diagnostics.py": "0633f98055ed7d25381b6124d5eff0d68b5ec2be82adb1c5fd4d79bed90a7f18"
+    },
+    "preparationFailures": [
+      {
+        "type": "strict schema compatibility",
+        "result": "First immutable diagnostic has promptSHA in raw, not duplicated in record; checker initially rejected30rows. Fixed explicit legacy schema support while validating reconstructed raw prompt, without modifying stored proof."
+      },
+      {
+        "type": "test harness import",
+        "result": "One focused unit invocation failed with NameError after removing an import. Import restored; focused7tests now pass. No product behavior changed."
+      }
+    ]
+  },
+  "documentation": {
+    "command": [
+      "<existing-elegy-documentation>",
+      "check",
+      "--project",
+      ".",
+      "--json"
+    ],
+    "exitCode": 0,
+    "valid": true,
+    "issueCodes": [
+      "DOCS-CHECK-009"
+    ],
+    "validatorSha256": "27c72b6a18f53ced911372dd311914b898d07fdd5e8cb1ef89d789373fec3d60",
+    "linksChecked": 22,
+    "brokenLinks": []
+  },
+  "scopeDecision": "Pending user answer; normal configured Codex is gpt-6.1-sol/max, diagnostic proxy gpt-5.6-luna/medium. No inferred Sol result.",
+  "finalHarnessSuite": {
+    "command": [
+      "<python>",
+      "-m",
+      "unittest",
+      "test_qualification_runner",
+      "test_grade",
+      "test_replay",
+      "test_verify_diagnostics",
+      "-v"
+    ],
+    "exitCode": 0,
+    "tests": 33,
+    "method": "Native parent execution observed Ran33tests, OK, after final source changes. Prior22check source hashes are historical, not evidence for the subsequently hardened runner.",
+    "sourceSha256": {
+      "qualification_runner.py": "0af3c61bd27151e9b2e2d8c2a92b8925411f35cdc0e548a747576dc9dd045c30",
+      "test_qualification_runner.py": "cca4291fa0c8edf51c3cca173cc3e88e724f397dad6de7c07ba20c6c5f05f6b8",
+      "answer_runner.py": "9bd417a00518bccc0d61e75908996e0bdc80b62db9a6b96e8e278f831994ae0b",
+      "run_replay.py": "1581b08a921e4dca1bec1207ceed384d883f6061319c3edc519d25a97eed4d1f",
+      "grade.py": "bf330b80fa97bc734f73e4a8c3c9257201ba12fb0ecbc52277b2e46bbb78cf54",
+      "rpc_support.py": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759",
+      "test_grade.py": "1c6aec9ffbfa5557343c6a33d2c51527ae20a577ac000dc7657f101b54213404",
+      "test_replay.py": "d28d71f36fada67ffbfac1358937c91402bb85eef318cc2ce951963e24f9ff81",
+      "verify_diagnostics.py": "94f4c71af1675c3fb03049bee2e7ac5349ef888551e2dc0a81834143308b403b",
+      "test_verify_diagnostics.py": "0633f98055ed7d25381b6124d5eff0d68b5ec2be82adb1c5fd4d79bed90a7f18"
+    }
+  }
+}

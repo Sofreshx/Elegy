@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "memory-evidence-harness-checks/v1",
+  "argv": [
+    "python",
+    "-m",
+    "unittest",
+    "test_campaign",
+    "test_assess",
+    "-q"
+  ],
+  "exitCode": 0,
+  "observedTests": 18,
+  "output": "----------------------------------------------------------------------\nRan 18 tests in 32.646s\n\nOK\n",
+  "sourceSha256": {
+    "campaign.py": "440bb98cca4488f3688b17ce3946eb5f8df1e2572aa543dec41ef330393489c0",
+    "test_campaign.py": "352aeba1696136aca8965e2c3059e64e0f66642b57aaa10f1f2d8f0e84bfff1c",
+    "assess.py": "9ed04a451f31fdf460dfc6eeb414205317365bafcc5c883909f0fa0c5903bd89",
+    "test_assess.py": "d0214b2e6e88d1d0ee7318f1e3bf2c37de98aaea60031eb11143101f3e8141bf",
+    "prepare_review.py": "4c01c54dd4e6dcb75d294f2e615a17b42b51cc75d637371e4ece5c8a731b113b"
+  },
+  "assessmentExitCode": 1,
+  "assessmentEvidenceConsistent": true,
+  "assessmentQualityGate": false,
+  "recordPreparation01": "Sandbox AccessDenied retained record-output.json; native record-output-02.json is the actual adverse receipt."
+}

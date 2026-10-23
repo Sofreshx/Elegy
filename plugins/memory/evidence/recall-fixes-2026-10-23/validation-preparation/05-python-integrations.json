@@ -1,0 +1,7 @@
+{
+  "argv": "python -m unittest discover -s plugins/memory/integrations/codex -p test_*.py",
+  "exit": 1,
+  "duration_seconds": 10.527,
+  "tests_run": "14",
+  "log": "plugins/memory/evidence/recall-fixes-2026-10-23/runtime/full-validation/05-python-integrations.log"
+}

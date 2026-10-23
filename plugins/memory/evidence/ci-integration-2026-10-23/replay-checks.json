@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "memory-replay-checks/v1",
+  "sourceRevision": "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1",
+  "subjectSha256": "ffc6ae4b11d55cc19a8ac075a4800bc9de779343ca72a6d903f81c7818e6888f",
+  "protocolSha256": "1f42dfc566ce2d2cf525ddb0021fb3fc9da8ee845fb78306b2ad74efddbd6a76",
+  "status": "passed",
+  "errors": [],
+  "totals": {
+    "packets": 37,
+    "sourceUnchanged": 37,
+    "verifiedEmptyNamespaces": 24,
+    "controls": 42
+  },
+  "phases": [
+    {
+      "phase": "replay-primary",
+      "packets": 25,
+      "sourceUnchanged": 25,
+      "verifiedEmptyNamespaces": 16,
+      "controls": 30,
+      "manifestSha256": "463cd72f71011f123e400c8696aa702ba567c3203d0979782e8117a86ab8f4a3"
+    },
+    {
+      "phase": "replay-transfer",
+      "packets": 12,
+      "sourceUnchanged": 12,
+      "verifiedEmptyNamespaces": 8,
+      "controls": 12,
+      "manifestSha256": "6c3182b8ed77c07ffee7f61c3d3d79003d57c86440457ed9adcaef9316803e19"
+    }
+  ],
+  "checks": "Exact wrappers/input/harness/binaries; complete normalized configuration; actual source/correction/owner/foreign/deletion controls; immutable durable source; latest-stored envelope; byte cap600; hostile exposure q12/h06; foreign secret absent q15; deleted contexts empty q24/h12; both namespaces cleared each episode."
+}

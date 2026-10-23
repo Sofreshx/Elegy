@@ -1,0 +1,26 @@
+{
+  "scope": "Qualification harness logic reused byte-normalized from Q6; exactly4 subject-identity substitutions, no behavior/test/acceptance weakening.",
+  "qualificationFiles": 8,
+  "replacements": [
+    {
+      "old": "95bf15ba2afa8e7655c45a8127b6a060893b695a",
+      "new": "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1"
+    },
+    {
+      "old": "1fe80e6ccdd04e20e64d1647758b1fd5209f81a1ae1afc779e1d5c2ffea598bc",
+      "new": "1742beff51d26ca32749e7b70ef7cce365f6ed4d3636f5c5e7116a4ecd0783ba"
+    },
+    {
+      "old": "b9c6e9de11754ca55f2f5f9c6530bf83d871357eef352ca87b0be73ef3d8f676",
+      "new": "55b76918b44dc1e556a027f444d0c47c8e1175bae6d3d7a59df1fc274917afd6"
+    },
+    {
+      "old": "9083f13f079e3028b15a56db0813890d826f61c8702cbd2e984dfc6b149851fe",
+      "new": "ad5e338e9733a0dd1516e9fec28b99f625fe63246c0b52cf929ddc9b1cf83c7b"
+    }
+  ],
+  "strictAcceptancePreserved": true,
+  "sourceProofVerified": true,
+  "preflightAll": true,
+  "corporaUnchanged": true
+}

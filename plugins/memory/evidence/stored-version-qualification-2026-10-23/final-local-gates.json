@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "memory-final-local-gates/v1",
+  "sourceRevision": "95bf15ba2afa8e7655c45a8127b6a060893b695a",
+  "subjectSha256": "01d2d162639b7aace41503649d18e3517c5ef1ddf81fc2266f42214ed7fd1d8c",
+  "sourceFilesUnchanged": 149,
+  "mcpSourceFilesUnchanged": 18,
+  "qualificationSourcesUnchanged": 8,
+  "binaryHashesUnchanged": true,
+  "markdownLinksChecked": 176,
+  "missingLinks": [],
+  "memoryTestsPassed": 408,
+  "memoryTestsIgnored": 0,
+  "harnessTestsPassed": 22,
+  "qualityWithRecallPassed": 47,
+  "modelThreads": 84,
+  "newPaidApiCalls": 0,
+  "limitations": "Selected explicit isolated CodexCLI configuration only; other software host excluded; no automatic Desktop hook/daily-use/global/economy claim."
+}

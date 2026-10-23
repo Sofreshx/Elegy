@@ -1,0 +1,155 @@
+
+running 6 tests
+test native_host_tests::bundled_action_tools_bind_client_purpose_and_provider_outside_llm_arguments ... ok
+test native_host_tests::live_github_proof_requires_explicit_read_only_consent ... ok
+test native_host_tests::accepts_discovery_hint_but_rejects_any_secret_bearing_message ... ok
+test native_host_tests::local_client_and_ui_mutation_boundaries_fail_closed ... ok
+test native_host_tests::live_proof_secret_scan_includes_nested_sqlite_sidecars ... ok
+test native_host_tests::github_device_flow_matches_provider_contract_without_exposing_secrets ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 15 tests
+test agent_surface_has_account_tools_but_no_secret_or_raw_execution_tool ... ok
+test live_proof_rejects_a_source_binary_before_accessing_any_account ... ok
+test open_can_return_the_local_center_url_without_launching ... ok
+test open_can_target_a_durable_request_without_putting_secrets_in_the_url ... ok
+test action_mcp_advertises_only_the_bundled_typed_read_operations ... ok
+test mcp_server_advertises_only_the_bounded_account_tools ... ok
+test status_is_machine_readable_and_secret_free ... ok
+test unknown_commands_fail_closed ... ok
+test action_mcp_executes_a_typed_read_through_the_running_broker ... ok
+test packaged_accounts_archive_preserves_surface_and_advertises_all_tools has been running for over 60 seconds
+test packaged_live_proof_calls_declared_mcp_and_proves_post_disconnect_failure has been running for over 60 seconds
+test packaged_live_proof_never_falls_back_to_github_cli_credentials has been running for over 60 seconds
+test packaged_live_proof_requires_a_dedicated_device_flow_client has been running for over 60 seconds
+test packaged_live_proof_requires_an_explicit_isolated_data_root has been running for over 60 seconds
+test packaged_live_proof_waits_for_device_flow_and_matching_action_approval has been running for over 60 seconds
+test packaged_accounts_archive_preserves_surface_and_advertises_all_tools ... FAILED
+test packaged_live_proof_never_falls_back_to_github_cli_credentials ... FAILED
+test packaged_live_proof_requires_an_explicit_isolated_data_root ... FAILED
+test packaged_live_proof_waits_for_device_flow_and_matching_action_approval ... FAILED
+test packaged_live_proof_requires_a_dedicated_device_flow_client ... FAILED
+test packaged_live_proof_calls_declared_mcp_and_proves_post_disconnect_failure ... FAILED
+
+failures:
+
+---- packaged_accounts_archive_preserves_surface_and_advertises_all_tools stdout ----
+
+thread 'packaged_accounts_archive_preserves_surface_and_advertises_all_tools' (6128) panicked at plugins\accounts\crates\elegy-account-cli\tests\agent_surface.rs:162:27:
+called `Result::unwrap()` on an `Err` value: Io(Os { code: 112, kind: StorageFull, message: "There is not enough space on the disk." })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- packaged_live_proof_never_falls_back_to_github_cli_credentials stdout ----
+
+thread 'packaged_live_proof_never_falls_back_to_github_cli_credentials' (18704) panicked at plugins\accounts\crates\elegy-account-cli\tests\agent_surface.rs:964:10:
+called `Result::unwrap()` on an `Err` value: Io(Os { code: 112, kind: StorageFull, message: "There is not enough space on the disk." })
+
+---- packaged_live_proof_requires_an_explicit_isolated_data_root stdout ----
+
+thread 'packaged_live_proof_requires_an_explicit_isolated_data_root' (24096) panicked at plugins\accounts\crates\elegy-account-cli\tests\agent_surface.rs:913:10:
+called `Result::unwrap()` on an `Err` value: Io(Os { code: 112, kind: StorageFull, message: "There is not enough space on the disk." })
+
+---- packaged_live_proof_waits_for_device_flow_and_matching_action_approval stdout ----
+
+thread 'packaged_live_proof_waits_for_device_flow_and_matching_action_approval' (21532) panicked at plugins\accounts\crates\elegy-account-cli\tests\agent_surface.rs:631:10:
+called `Result::unwrap()` on an `Err` value: Io(Os { code: 112, kind: StorageFull, message: "There is not enough space on the disk." })
+
+---- packaged_live_proof_requires_a_dedicated_device_flow_client stdout ----
+
+thread 'packaged_live_proof_requires_a_dedicated_device_flow_client' (35408) panicked at plugins\accounts\crates\elegy-account-cli\tests\agent_surface.rs:863:10:
+called `Result::unwrap()` on an `Err` value: Io(Os { code: 112, kind: StorageFull, message: "There is not enough space on the disk." })
+
+---- packaged_live_proof_calls_declared_mcp_and_proves_post_disconnect_failure stdout ----
+
+thread 'packaged_live_proof_calls_declared_mcp_and_proves_post_disconnect_failure' (13416) panicked at plugins\accounts\crates\elegy-account-cli\tests\agent_surface.rs:441:10:
+called `Result::unwrap()` on an `Err` value: Io(Os { code: 112, kind: StorageFull, message: "There is not enough space on the disk." })
+
+
+failures:
+    packaged_accounts_archive_preserves_surface_and_advertises_all_tools
+    packaged_live_proof_calls_declared_mcp_and_proves_post_disconnect_failure
+    packaged_live_proof_never_falls_back_to_github_cli_credentials
+    packaged_live_proof_requires_a_dedicated_device_flow_client
+    packaged_live_proof_requires_an_explicit_isolated_data_root
+    packaged_live_proof_waits_for_device_flow_and_matching_action_approval
+
+test result: FAILED. 9 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 93.14s
+
+
+--- stderr ---
+   Compiling windows-sys v0.61.2
+   Compiling rand_core v0.6.4
+   Compiling futures-util v0.3.32
+   Compiling tracing v0.1.44
+   Compiling crypto-common v0.1.7
+   Compiling zeroize_derive v1.5.0
+   Compiling unicase v2.9.0
+   Compiling num-traits v0.2.19
+   Compiling rustls v0.23.46
+   Compiling zip v9.0.5
+   Compiling http-range-header v0.4.2
+   Compiling mime_guess v2.0.5
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling serde_yaml v0.9.34+deprecated
+   Compiling getrandom v0.3.4
+   Compiling inout v0.1.4
+   Compiling zeroize v1.9.0
+   Compiling cipher v0.4.4
+   Compiling chrono v0.4.45
+   Compiling universal-hash v0.5.1
+   Compiling rustls-pki-types v1.14.1
+   Compiling opaque-debug v0.3.1
+   Compiling polyval v0.6.2
+   Compiling ppv-lite86 v0.2.21
+   Compiling rustls-webpki v0.103.16
+   Compiling webpki-roots v1.0.10
+   Compiling rand_core v0.9.5
+   Compiling ghash v0.5.1
+   Compiling ctr v0.9.2
+   Compiling rand_chacha v0.9.0
+   Compiling aes v0.8.4
+   Compiling schemars v1.2.1
+   Compiling futures-executor v0.3.32
+   Compiling aead v0.5.2
+   Compiling rmcp v1.8.0
+   Compiling aes-gcm v0.10.3
+   Compiling futures v0.3.32
+   Compiling rand v0.9.4
+   Compiling uuid v1.23.3
+   Compiling hmac v0.12.1
+   Compiling axum-core v0.5.6
+   Compiling socket2 v0.6.4
+   Compiling mio v1.2.1
+   Compiling anstyle-query v1.1.5
+   Compiling anstyle-wincon v3.0.11
+   Compiling elegy-plugin-sdk v0.1.0 (<local-path>)
+   Compiling tempfile v3.27.0
+   Compiling tokio v1.52.3
+   Compiling anstream v1.0.0
+   Compiling clap_builder v4.6.0
+   Compiling clap v4.6.1
+   Compiling elegy-mcp v0.1.0 (<local-path>)
+   Compiling hyper v1.10.1
+   Compiling tokio-util v0.7.18
+   Compiling tower v0.5.3
+   Compiling tokio-rustls v0.26.4
+   Compiling process-wrap v9.1.0
+   Compiling tokio-stream v0.1.18
+   Compiling tower-http v0.6.11
+   Compiling hyper-util v0.1.20
+   Compiling hyper-rustls v0.27.9
+   Compiling axum v0.8.9
+   Compiling reqwest v0.12.28
+   Compiling elegy-tooling v0.1.0 (<local-path>)
+   Compiling elegy-adapter-http v0.1.0 (<local-path>)
+   Compiling elegy-accountd v0.1.0 (<local-path>)
+   Compiling elegy-runtime v0.1.0 (<local-path>)
+   Compiling elegy-core v0.1.0 (<local-path>)
+   Compiling elegy-accounts v0.1.0 (<local-path>)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 15s
+     Running unittests src\main.rs (<local-path>)
+     Running tests\agent_surface.rs (<local-path>)
+error: test failed, to rerun pass `-p elegy-accounts --test agent_surface`

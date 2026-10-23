@@ -1,0 +1,43 @@
+{
+  "answer": "L’identifiant précis de sauvegarde Ares est `BACKUP_COPAL`. La sauvegarde particulière à restaurer pour cet incident non documenté est inconnue.",
+  "threadId": "01a16771-e8eb-7ab1-80cc-72d9334653ec",
+  "usage": {
+    "input_tokens": 20716,
+    "cached_input_tokens": 10496,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 145,
+    "reasoning_output_tokens": 105
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a16771-e8eb-7ab1-80cc-72d9334653ec\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"L’identifiant précis de sauvegarde Ares est `BACKUP_COPAL`. La sauvegarde particulière à restaurer pour cet incident non documenté est inconnue.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20716,\"cached_input_tokens\":10496,\"cache_write_input_tokens\":0,\"output_tokens\":145,\"reasoning_output_tokens\":105}}\n",
+  "stderr": "2026-10-23T06:28:00.896009Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q09",
+  "arm": "with",
+  "startedAt": "2026-10-23T06:28:00.235351+00:00",
+  "completedAt": "2026-10-23T06:28:09.095411+00:00",
+  "elapsedMs": 8860.188,
+  "promptSha256": "3b042a3b536857977d752496095b1fc96560aac72ee8396fff2ab206d2a921f3",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

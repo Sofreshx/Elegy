@@ -1,0 +1,4 @@
+* -text whitespace=trailing-space,space-before-tab,cr-at-eol
+# Preserve observed blank final log lines and Markdown hard breaks verbatim.
+*.log -text whitespace=-blank-at-eof,cr-at-eol
+answers.md -text whitespace=-blank-at-eol,cr-at-eol

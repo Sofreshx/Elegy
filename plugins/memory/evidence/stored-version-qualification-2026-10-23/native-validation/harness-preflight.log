@@ -1,0 +1,51 @@
+
+--- stderr ---
+test_phase_specs_are_frozen (test_campaign.CampaignTests.test_phase_specs_are_frozen) ... ok
+test_preflight_rejects_source_or_binary_drift (test_campaign.CampaignTests.test_preflight_rejects_source_or_binary_drift) ... ok
+test_replay_after_hash_is_checked_with_a_passing_control (test_campaign.CampaignTests.test_replay_after_hash_is_checked_with_a_passing_control) ... ok
+test_run_phase_refuses_existing_output (test_campaign.CampaignTests.test_run_phase_refuses_existing_output) ... ok
+test_runner_failure_is_preserved (test_campaign.CampaignTests.test_runner_failure_is_preserved) ... ok
+test_wrapper_alone_prevents_retry_before_preflight (test_campaign.CampaignTests.test_wrapper_alone_prevents_retry_before_preflight) ... ok
+test_bindings_require_exact_inputs_and_unchanged_client (test_assess.AssessTests.test_bindings_require_exact_inputs_and_unchanged_client) ... ERROR
+test_current_override_without_history_may_omit_unknown_transport (test_assess.AssessTests.test_current_override_without_history_may_omit_unknown_transport) ... ok
+test_every_semantic_flag_blocks_with_recall_and_repeats (test_assess.AssessTests.test_every_semantic_flag_blocks_with_recall_and_repeats) ... ok
+test_false_review_cannot_be_accepted (test_assess.AssessTests.test_false_review_cannot_be_accepted) ... ok
+test_inventory_sizes_are_fixed (test_assess.AssessTests.test_inventory_sizes_are_fixed) ... ok
+test_pair_metrics_use_both_arms (test_assess.AssessTests.test_pair_metrics_use_both_arms) ... ok
+test_review_must_bind_answer_and_raw_bytes (test_assess.AssessTests.test_review_must_bind_answer_and_raw_bytes) ... ok
+test_tool_item_and_prose_flags_are_blocking (test_assess.AssessTests.test_tool_item_and_prose_flags_are_blocking) ... ok
+test_valid_raw_passes_and_each_mutation_fails (test_assess.AssessTests.test_valid_raw_passes_and_each_mutation_fails) ... ok
+test_without_abstention_is_valid_only_for_allowed_kinds (test_assess.AssessTests.test_without_abstention_is_valid_only_for_allowed_kinds) ... ok
+test_committed_source_restores_exact_compiled_bytes (test_verify_source.ImmutableSourceTests.test_committed_source_restores_exact_compiled_bytes) ... ok
+test_mutated_git_and_checkout_bindings_are_rejected (test_verify_source.ImmutableSourceTests.test_mutated_git_and_checkout_bindings_are_rejected) ... ok
+test_all_normalized_recall_configuration_fields_are_bound (test_evidence_binding.EvidenceBindingTests.test_all_normalized_recall_configuration_fields_are_bound) ... ok
+test_review_binds_the_actual_question_and_context (test_evidence_binding.EvidenceBindingTests.test_review_binds_the_actual_question_and_context) ... ok
+
+======================================================================
+ERROR: test_bindings_require_exact_inputs_and_unchanged_client (test_assess.AssessTests.test_bindings_require_exact_inputs_and_unchanged_client)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 78, in test_bindings_require_exact_inputs_and_unchanged_client
+    manifest = assess.expected_manifest_bindings("answers-primary", protocol, subject)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 51, in expected_manifest_bindings
+    expected = campaign_hashes(Q2, corpus_path(phase), PROTOCOL, replay)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 68, in campaign_hashes
+    hashes["replayRunSha256"] = sha(replay_path)
+                                ^^^^^^^^^^^^^^^^
+  File "<local-path>", line 19, in sha
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+                          ^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 1019, in read_bytes
+    with self.open(mode='rb') as f:
+         ^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '<local-path>'
+
+----------------------------------------------------------------------
+Ran 20 tests in 34.759s
+
+FAILED (errors=1)

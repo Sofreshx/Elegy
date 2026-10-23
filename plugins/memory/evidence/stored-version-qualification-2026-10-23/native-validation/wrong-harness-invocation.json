@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "memory-preparation-command-error/v1",
+  "argv": [
+    "<python>",
+    "../codex-qualification-2026-10-23/campaign.py",
+    "--phase",
+    "replay-primary"
+  ],
+  "exitCode": 1,
+  "error": "RuntimeError: phase wrapper output already exists",
+  "classification": "Delegated command selected historicalQ3 instead of requestedQ6. Guard refused before preflight or any write. No experiment executed, no new model invocation.",
+  "filesWritten": [],
+  "historicalManifestUnchanged": true,
+  "resolution": "Parent takes tightly coupled phase execution with the full absoluteQ6path. No outputs removed or overwritten."
+}

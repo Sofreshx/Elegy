@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "memory-native-check/v1",
+  "kind": "zip-compatibility-validation",
+  "status": "passed",
+  "gitHead": "a753b4b5f4bddf553a5b11255b3532957291d9c2",
+  "rawLogsAvailable": false,
+  "evidenceLimit": "The command results below are exact observed summaries retained after execution; raw terminal streams were not persisted and are not reconstructed.",
+  "sanitizer": {
+    "script": "plugins/memory/evidence/ci-integration-2026-10-23/sanitize_evidence.py",
+    "scriptSha256": "17b5048e26043444f59c68e561e97c29b5c86fb92ad969e3a8f51e138e05df29",
+    "method": "sanitize_bytes",
+    "replacementCounts": {
+      "windows_absolute_path": 0,
+      "neutralized_appdata_fragment": 0
+    }
+  },
+  "sourceFiles": {
+    "Cargo.toml": "2e7499a874cbd4c2b948ff395632a1511af7d1486747f0665752e7c0c6d45340",
+    "Cargo.lock": "b9feef8ff8428bf28ed07351c8ac3a0b0635208a11741dafbe8339a24fc9f052",
+    "shared/tooling/Cargo.toml": "762d8cc741e8ef7d81f1f5b9ac7f8085a1bf09ee1a7aeabaa8de5bc46baf4e32",
+    "shared/plugin-sdk/Cargo.toml": "55a1b99e9fcc41811b6c51d76305209804ff7a53e8d9125741bc30a3b22101e5",
+    "shared/tooling/src/installer.rs": "a9509996d5d290f7cc6c461a2906b5a9a08f6a1a93f7a346f030187f7ffa0976",
+    "shared/tooling/src/capability_installer.rs": "296ddf38ac3f64a4dc4eac478e75c374a2696909b3816b30df529e95f37c6b6d",
+    "shared/plugin-sdk/src/lib.rs": "6c07232a1ed510b3eade10d50daccc75c77bbb7a5286a80b4c75b663a11dc849"
+  },
+  "commands": [
+    {
+      "name": "locked-check",
+      "argv": ["cargo", "check", "--locked", "-p", "elegy-tooling", "-p", "elegy-plugin-sdk", "-p", "elegy-core", "-p", "elegy-accounts"],
+      "exitCode": 0,
+      "resultCounts": {"packagesChecked": 4},
+      "log": "zip-compat-check-02.log",
+      "logSha256": "e586761f9a140e9fc1436021d3d7e21fa139f61d3e58b8186add990c5b7722f9"
+    },
+    {
+      "name": "full-four-crate-tests",
+      "argv": ["cargo", "test", "--locked", "-p", "elegy-tooling", "-p", "elegy-plugin-sdk", "-p", "elegy-core", "-p", "elegy-accounts"],
+      "exitCode": 0,
+      "resultCounts": {"elegy-accounts": {"passed": 21, "failed": 0}, "elegy-core": {"passed": 8, "failed": 0}, "elegy-plugin-sdk": {"passed": 84, "failed": 0}, "elegy-tooling": {"passed": 38, "failed": 0}, "totalPassed": 151, "totalFailed": 0},
+      "log": "zip-compat-tests-01.log",
+      "logSha256": "06097c6084be4aa2dbd406dfbffbde74128ac2cf7f0a18fa726bd0ef38e163cf"
+    },
+    {
+      "name": "malformed-archive-regression",
+      "argv": ["cargo", "test", "--locked", "-p", "elegy-tooling", "--bin", "elegy-plugin-packaging", "installer::tests::install_rejects_malformed_entry_filename_before_writing", "--", "--exact", "--nocapture"],
+      "exitCode": 0,
+      "resultCounts": {"passed": 1, "failed": 0, "filtered": 17},
+      "log": "zip-compat-targeted-02.log",
+      "logSha256": "672a909cc3e7c5dd28291ab3265beeb743f701f423bad257a0af956225374888"
+    },
+    {
+      "name": "format-check",
+      "argv": ["cargo", "fmt", "--all", "--", "--check"],
+      "exitCode": 0,
+      "resultCounts": {"differences": 0},
+      "log": "zip-compat-fmt-02.log",
+      "logSha256": "1f999506ba2886cf6167677d00b75c0ea8c98af23b5571d6f3d9d7e5085844f1"
+    }
+  ],
+  "priorFailedAttempts": [
+    {"phase": "pre-fix-check", "exitCode": 1, "observation": "zip 9 API rejected name().to_string() at capability_installer.rs:359; retained as historical failure."},
+    {"phase": "sandbox-focused-test", "exitCode": 1, "observation": "sandbox returned InstallError::Io PermissionDenied; not treated as product behavior."},
+    {"phase": "sandbox-full-tests", "exitCode": 1, "observation": "loopback/file permission failures and pre-fix ZIP mode 0o664 versus expected 0o755; superseded by normal-filesystem validation."},
+    {"phase": "sandbox-format", "exitCode": 1, "observation": "sandbox canonicalization returned Access denied; superseded by normal-filesystem format check."}
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "memory-pinned-binaries/v1",
+  "productSourceRevision": "b828223bd9897c559a4ed9ed39f3c17f34284033",
+  "evidencePreparationRevision": "1d71d3c",
+  "hashes": {
+    "elegy-memory.exe": "4f6fdaa80b0c8809af8b217a786232b0d71cfa30f5130f0fc1323e1513cae833",
+    "elegy-memory-mcp-stdio.exe": "d93610c224af1549708bc7f3fff2b51b9b4601bc4bfc480fdf0588748ba86f93"
+  },
+  "buildMatchesSource": true,
+  "method": "Copies from completed Cargo builds, hashes checked before/copy/after; isolated source unchanged; immutable qualification copies avoid later rebuild replacement."
+}

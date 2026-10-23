@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "memory-ci-independent-review/v1",
+  "verdict": "pass",
+  "scope": "Completed repo-shape, privacy derivatives, historical Gitleaks fingerprint exceptions and capture guards. ZIP/API delta excluded for separate review.",
+  "reviewer": "independent Codex-native reviewer, parent acceptance",
+  "resolvedFindings": [
+    "Unreadable tracked files must produce blocking content.unreadable instead of looking empty.",
+    "Source HEAD/dirty guards must remain active under Python -O.",
+    "New public RED logs must be neutralized with explicit original/public hash bindings."
+  ],
+  "findings": [],
+  "checks": [
+    "All16 Q6 receipt inputs unchanged vs a753b4b",
+    "All3 old evidence derivatives reconstruct original Git blobs",
+    "All5 localcheck log hashes unique and verified",
+    "Both new REDlogs reconstruct from raw local capture and explicit sanitizer",
+    "Full stagedrepo-shape0issues",
+    "Documentation inspect/map/check and bundleexport exit0; existingwarning retained"
+  ],
+  "files": [
+    {
+      "path": "scripts/check-repo-shape.ps1",
+      "sha256": "2de1ca4216e5cc7d32fd389d16a501a4ca7ba9f29c5aed4cd9d1be52ef17143a"
+    },
+    {
+      "path": "scripts/test-check-repo-shape.ps1",
+      "sha256": "97f8b64b5db3378d43dff058698ab05bc9b2773f73ac088e89d1e7e9ad72a1c2"
+    },
+    {
+      "path": ".gitleaksignore",
+      "sha256": "123eb1e777632050e88c81c77a8a32eb038900a5d3ff1a565ed724928eb003b1"
+    },
+    {
+      "path": "plugins/memory/evidence/ci-integration-2026-10-23/capture_source.py",
+      "sha256": "c0e6fb460c97e95e8480e718fcc5c71983cab3f1e2c7bb4210fd6d2095603d19"
+    },
+    {
+      "path": "plugins/memory/evidence/ci-integration-2026-10-23/run_native.py",
+      "sha256": "c1a128432934ceeaff7b2dd4a47218048acc4bd25a521abc1136fc6b7b702156"
+    },
+    {
+      "path": "plugins/memory/evidence/ci-integration-2026-10-23/sanitize_evidence.py",
+      "sha256": "17b5048e26043444f59c68e561e97c29b5c86fb92ad969e3a8f51e138e05df29"
+    },
+    {
+      "path": "plugins/memory/evidence/ci-integration-2026-10-23/test_sanitize_evidence.py",
+      "sha256": "88d31b4eec3a9f3f537dd1a693ff5a3af0375429ff165b61cd96a24400eae4d0"
+    }
+  ]
+}

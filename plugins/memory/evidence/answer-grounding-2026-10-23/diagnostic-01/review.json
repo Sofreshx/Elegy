@@ -1,0 +1,102 @@
+{
+  "schemaVersion": "memory-grounding-diagnostic-review/v1",
+  "runSha256": "24fd11b70b630b8fc770479e7c8555fdf45858ee52cb16f1a41a9b00af4b1a8f",
+  "status": "candidate-rejected",
+  "productSourceChanged": false,
+  "reviewMethod": "Orchestrator read all30 actual answers. No false lexical negatives in this diagnostic; the unsupported identifier and omitted retention remain real failures.",
+  "conditions": {
+    "current": {
+      "full": 10,
+      "total": 15
+    },
+    "candidate": {
+      "full": 10,
+      "total": 15
+    }
+  },
+  "failures": [
+    {
+      "caseId": "q08",
+      "condition": "current",
+      "trial": 1,
+      "error": "retention-omitted",
+      "rawPath": "current/trial-1/raw/q08_with.json",
+      "rawSha256": "8e62c47688a38db603234d83c851605d0f4bdb14a66854485d999b6fa89b73ec"
+    },
+    {
+      "caseId": "q09",
+      "condition": "current",
+      "trial": 1,
+      "error": "attribute-substitution",
+      "rawPath": "current/trial-1/raw/q09_with.json",
+      "rawSha256": "b0cbfeff1a96c32b5d5a2e64aa7aefeb343def9ec148b6b77306f6c3e171fa7a"
+    },
+    {
+      "caseId": "q08",
+      "condition": "current",
+      "trial": 2,
+      "error": "retention-omitted",
+      "rawPath": "current/trial-2/raw/q08_with.json",
+      "rawSha256": "df06d46a310c3817efec3b04d4d4c614172070b8ec4d3315523f2efb3cfdf8c1"
+    },
+    {
+      "caseId": "q09",
+      "condition": "current",
+      "trial": 2,
+      "error": "attribute-substitution",
+      "rawPath": "current/trial-2/raw/q09_with.json",
+      "rawSha256": "7acb65e97158f40e6ea25d030c22a7176aaa3cd386b28c3e32da152d50db65b7"
+    },
+    {
+      "caseId": "q09",
+      "condition": "current",
+      "trial": 3,
+      "error": "attribute-substitution",
+      "rawPath": "current/trial-3/raw/q09_with.json",
+      "rawSha256": "5303307df59ac9f84abaadb9ba76f1bacdaff21a2b65737b3dbe95f01b1bec04"
+    },
+    {
+      "caseId": "q09",
+      "condition": "candidate",
+      "trial": 1,
+      "error": "attribute-substitution",
+      "rawPath": "candidate/trial-1/raw/q09_with.json",
+      "rawSha256": "b2d0a5bf5bf2a6168c859641e2f9480f7d8c05a963768acb2e71b8c10a958fd5"
+    },
+    {
+      "caseId": "q08",
+      "condition": "candidate",
+      "trial": 2,
+      "error": "retention-omitted",
+      "rawPath": "candidate/trial-2/raw/q08_with.json",
+      "rawSha256": "c66c38c302bafe48d4d5c358a2358287b328dcc3b730de1ebed145b873363958"
+    },
+    {
+      "caseId": "q09",
+      "condition": "candidate",
+      "trial": 2,
+      "error": "attribute-substitution",
+      "rawPath": "candidate/trial-2/raw/q09_with.json",
+      "rawSha256": "61da48fb8703d58223564735e0c44599dfc32f0956ddae0b0999452159962644"
+    },
+    {
+      "caseId": "q08",
+      "condition": "candidate",
+      "trial": 3,
+      "error": "retention-omitted",
+      "rawPath": "candidate/trial-3/raw/q08_with.json",
+      "rawSha256": "ebbda7b0c894979a479c62ad94faac3a7bf31419c77d25bd90bc5d52b192b750"
+    },
+    {
+      "caseId": "q09",
+      "condition": "candidate",
+      "trial": 3,
+      "error": "attribute-substitution",
+      "rawPath": "candidate/trial-3/raw/q09_with.json",
+      "rawSha256": "624a6a4146b09664bcae248ce5e14a31ef76194bfffeb44cd0d055acdc01c4eb"
+    }
+  ],
+  "targetedControlFailure": true,
+  "harborControlsAllCorrect": true,
+  "conclusion": "Changing generic wording alone is not supported as a remedy. Preserve the existing product prefix and investigate representation; no production change or passing quality claim."
+}

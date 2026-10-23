@@ -1,0 +1,11 @@
+{
+  "status": "pre-replay checks completed with one premature dependency error",
+  "passed": 19,
+  "errors": 1,
+  "failingCheck": "test_bindings_require_exact_inputs_and_unchanged_client",
+  "cause": "It requires replay-primary/run.json, which is intentionally not generated yet. Two other actual-replay checks were excluded prospectively; this third dependency was missed in the pre-replay selector.",
+  "sourceOrBinaryFailure": false,
+  "resolution": "Run all22 unchanged harness tests after both actual local replays and before any model call. Preserve original failed invocation; no fabricated passing aggregate.",
+  "sourceLog": "harness-preflight.log",
+  "sourceLogSha256": "c900d80d65a33a9e3ddc8131323e6a78dea21c4265e92bec7829cb8e0b91bb0f"
+}

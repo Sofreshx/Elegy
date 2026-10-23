@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "memory-independent-prose-review-addendum/v1",
+  "originalReviewSha256": "d6e6181197cd92d1c376ebc7eccc94e48c3b287c2d441870746aea67d2c657cb",
+  "inputSha256": "c8ad4d404534ec61f56e4b2d89edaa1e0df0a33a6782816c4a496d457c3aaaf2",
+  "barèmeReference": "protocol.json acceptance.withoutRecall : les cibles explicitement inconnues, indisponibles, oubliées ou d’approbation sont complètes par abstention correcte.",
+  "records": [
+    {
+      "id": "a37fb4a7e1ce65e5",
+      "oldVerdict": {
+        "grounded": true,
+        "taskComplete": false,
+        "controlPass": true,
+        "formatPass": true
+      },
+      "newVerdict": {
+        "grounded": true,
+        "taskComplete": true,
+        "controlPass": true,
+        "formatPass": true
+      },
+      "reason": "Le budget est explicitement inconnu et la réponse indique aussi qu’aucun montant n’est documenté ; acceptance.withoutRecall rend complète cette abstention pour une cible inconnue et une demande d’approbation.",
+      "rawSha256": "9414f7529b2cb447ef72d099d86d6da80607a09cf75990ad79bbf9d6fd81fab2",
+      "answerSha256": "f9817fed2cf68c1bd62880594bda9ea47aa108c051318ca424665ceeb27bcb13",
+      "questionSha256": "d3e524ea40f656ca9b74a87914b86dfc26672f1df98f955ad0de5cc8cb1b3acc",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputRecordSha256": "b3417b25d8b5d86a5b42e71b77ceb50bb67731c4b23908381bc71e268ec27bfd"
+    },
+    {
+      "id": "b92d842cecca2a20",
+      "oldVerdict": {
+        "grounded": true,
+        "taskComplete": false,
+        "controlPass": true,
+        "formatPass": true
+      },
+      "newVerdict": {
+        "grounded": true,
+        "taskComplete": true,
+        "controlPass": true,
+        "formatPass": true
+      },
+      "reason": "Le contexte ne fournit aucun budget, seulement des valeurs de région et de rollback ; l’abstention sur le montant et son approbation est donc la réponse complète prévue pour une cible inconnue.",
+      "rawSha256": "6831ab5992ff1c08127bc6a2349a46fb5979c93ee9a73d7aa7c0cd2ec90d0e3a",
+      "answerSha256": "33c87d14727241f8d2c3ef38d0d3bacc3e9aa85a495cb2fcd6f14b34c36f8d8f",
+      "questionSha256": "d3e524ea40f656ca9b74a87914b86dfc26672f1df98f955ad0de5cc8cb1b3acc",
+      "contextSha256": "84f165685fb2548411039eec5791c29c0d7ff72f4af6d6cb8ed4e90d7a2c04dc",
+      "inputRecordSha256": "da23465390b69735931d51ce95a4f149a69650a5597818dda16fa97f242738f3"
+    },
+    {
+      "id": "b79bde9606d95a1a",
+      "oldVerdict": {
+        "grounded": true,
+        "taskComplete": false,
+        "controlPass": true,
+        "formatPass": true
+      },
+      "newVerdict": {
+        "grounded": true,
+        "taskComplete": true,
+        "controlPass": true,
+        "formatPass": true
+      },
+      "reason": "Aucun identifiant de snapshot n’est fourni dans le contexte vide ; la réponse signale exactement son indisponibilité, ce qui constitue l’abstention complète attendue pour une cible inconnue.",
+      "rawSha256": "f517aa30fb26cec18631e19fa44429a9724205ce722f8d15ec6ec75940fb40e9",
+      "answerSha256": "316c5a19fabc2148bfb4a078c802617eee087e3c8227ffab1d24ec0418aa99b5",
+      "questionSha256": "90fdcf356dfde692533eb3ae791f48365c987989cfb98a139a209da580f9edad",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputRecordSha256": "2bd3ae7798dd2c18ad8d5327af0e7a8ac1082a8bc65c1e42b46a2a198dbcdcf4"
+    },
+    {
+      "id": "fec9a559178058a7",
+      "oldVerdict": {
+        "grounded": true,
+        "taskComplete": false,
+        "controlPass": true,
+        "formatPass": true
+      },
+      "newVerdict": {
+        "grounded": true,
+        "taskComplete": true,
+        "controlPass": true,
+        "formatPass": true
+      },
+      "reason": "Le contexte ne contient que le runbook et la rétention, jamais un snapshot ; l’abstention sur l’identifiant exact est donc complète selon la règle des cibles inconnues.",
+      "rawSha256": "cd63b8bc25d5f271d8b87780d4e7833bb53d14105f5a0f4f4c1dfbc4e07d2891",
+      "answerSha256": "add2f2fe719808c63bfb0fc77c998282a5096c4eceb4bd4ee3bf42e2c07f9bde",
+      "questionSha256": "90fdcf356dfde692533eb3ae791f48365c987989cfb98a139a209da580f9edad",
+      "contextSha256": "a20f62d8a1385607f37230a5b574cfe7df2db2442479541f681ae40db1531ab7",
+      "inputRecordSha256": "747b323ad4345c5be072a4f0c476c13630aabce97e720aea450b765811e25a25"
+    }
+  ]
+}

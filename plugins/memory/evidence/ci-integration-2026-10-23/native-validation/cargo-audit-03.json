@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "ci-cargo-audit/v1",
+  "argv": [
+    "cargo",
+    "audit",
+    "--json",
+    "--no-fetch"
+  ],
+  "startedAt": "2026-10-23T12:20:53.172916+00:00",
+  "durationSeconds": 1.094,
+  "exitCode": 0,
+  "candidateLockSha256": "b9feef8ff8428bf28ed07351c8ac3a0b0635208a11741dafbe8339a24fc9f052",
+  "vulnerabilityCount": 0,
+  "vulnerabilities": [],
+  "warnings": {
+    "unmaintained": [
+      {
+        "id": "RUSTSEC-2024-0449",
+        "package": "unsafe-libyaml",
+        "version": "0.2.11",
+        "title": "unsafe-libyaml is unmaintained",
+        "url": "https://github.com/dtolnay/unsafe-libyaml",
+        "patched": []
+      }
+    ],
+    "yanked": [
+      {
+        "id": null,
+        "package": "chacha20",
+        "version": "0.10.0",
+        "title": null,
+        "url": null,
+        "patched": []
+      },
+      {
+        "id": null,
+        "package": "clipboard-win",
+        "version": "5.4.1",
+        "title": null,
+        "url": null,
+        "patched": []
+      }
+    ]
+  },
+  "database": {
+    "advisory-count": 1350,
+    "last-commit": null,
+    "last-updated": null,
+    "gitHead": "f7b2f6bc663452200bbe639ebb75e0c762b3422b"
+  },
+  "limits": "Exact candidate lock bytes; advisory database fetched in attempt1 today; no advisories ignored. Separate from answer quality.",
+  "auditVersion": "cargo-audit-audit 0.22.2"
+}

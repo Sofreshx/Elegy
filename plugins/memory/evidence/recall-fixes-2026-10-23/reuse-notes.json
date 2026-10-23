@@ -1,0 +1,13 @@
+{
+  "historicalEvidence": "reused-evidence.json",
+  "historicalHead": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+  "currentBase": "619f5dd705e6383a12b7d806369633df291fc1a3",
+  "rule": "Historical CI success is retained as historical evidence only. Modified Memory code is covered by new native suites. No fresh CI or other-platform pass is claimed for this unpushed task branch.",
+  "priorQualification": {
+    "localBranch": "codex/memory-realistic-20261023",
+    "commit": "afcc526e0e379b454d79d92a419723c606222ea5",
+    "baselinePackets": "baseline-packets.json",
+    "corpusIdentical": true
+  },
+  "nonOverlappingConcurrentWork": "Five Dependabot PRs observed; no competing Memory changes or active Elegy chat observed at initial inspection. Original checkout preserved."
+}

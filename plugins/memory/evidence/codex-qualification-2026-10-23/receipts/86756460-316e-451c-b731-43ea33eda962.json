@@ -1,0 +1,522 @@
+{
+  "sha256": "0baf2ae5101cad190908f7537d795f622c067e7800e8f7db844f1978c0087cc5",
+  "receipt": {
+    "schemaVersion": "memory-qualification/v1",
+    "id": "86756460-316e-451c-b731-43ea33eda962",
+    "sequence": 1,
+    "claimId": "recall.answer-quality",
+    "protocolSha256": "dc53bc58625e00a30abbe63fdb37e0597339860d6be48a1f901803709b3b1e07",
+    "createdAt": "2026-10-23T09:15:15.803794800Z",
+    "context": {
+      "sourceSha256": "52f9318b24099cdafb5a7aca6ec1dbac16cf5e6dd05f1352b72801ec9ebece70",
+      "buildSourceSha256": "52f9318b24099cdafb5a7aca6ec1dbac16cf5e6dd05f1352b72801ec9ebece70",
+      "executableSha256": "4f6fdaa80b0c8809af8b217a786232b0d71cfa30f5130f0fc1323e1513cae833",
+      "gitRevision": "73d39de6916dcc9ea6e63100dc1e4a26e3666b4b",
+      "dirty": true,
+      "os": "windows",
+      "arch": "x86_64"
+    },
+    "provenance": "external-observation",
+    "outcome": "inconclusive",
+    "checks": [
+      {
+        "name": "paired-inputs",
+        "passed": true,
+        "detail": "36 paired questions plus ten predeclared with-recall repetitions; no output replacement."
+      },
+      {
+        "name": "fixed-model-config",
+        "passed": true,
+        "detail": "Same installed client SHA, requested gpt-6.1-sol/max and sanitized configuration in all82 fresh contexts; backend/temperature unsealed."
+      },
+      {
+        "name": "predeclared-rubric",
+        "passed": true,
+        "detail": "Protocol/corpora frozen before first answer; lexical scores unchanged, strict prose judged separately."
+      },
+      {
+        "name": "independent-scoring",
+        "passed": true,
+        "detail": "All82 actual paragraphs reviewed with scores and arm labels masked, then checked by parent; rejected first review retained. Agent review, not human."
+      },
+      {
+        "name": "negative-controls",
+        "passed": false,
+        "detail": "Strict acceptance not met: q08 omits present retention in trials1/3. q20 honest approval caveat remains incomplete because corpus lacks approval. Other finite safety/abstention controls pass."
+      },
+      {
+        "name": "mean-quality-improves",
+        "passed": true,
+        "detail": "Mean paired normalized score must strictly improve; limited to this sample."
+      }
+    ],
+    "measurements": {
+      "costUnit": "paid-api-calls",
+      "meanScoreImprovement": 0.6018518518518517,
+      "pairedCaseCount": 36
+    },
+    "durationMs": 490877,
+    "observation": {
+      "schemaVersion": "memory-observation/v1",
+      "claimId": "recall.answer-quality",
+      "protocolVersion": 1,
+      "subject": {
+        "artifactSha256": "4f6fdaa80b0c8809af8b217a786232b0d71cfa30f5130f0fc1323e1513cae833",
+        "host": "Installed Codex CLI; gpt-6.1-sol/max; explicit isolated lexical Memory packets",
+        "hostVersion": "codex-cli 0.163.0-alpha.11",
+        "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6"
+      },
+      "sessions": [
+        "01a167f6-e810-7511-8e46-9f162c75c507",
+        "01a167f7-1790-7751-bac7-e4d246ada5f0",
+        "01a167f6-e7ec-7bc2-b886-5580811eca19",
+        "01a167f7-2288-71c2-aaab-325af872fb37",
+        "01a167f6-e7ec-74b3-9a40-71e05a257141",
+        "01a167f7-2287-78b1-bb6b-038d63077feb",
+        "01a167f7-5cb2-72e0-82ea-33c8a2fdcb96",
+        "01a167f7-878a-7513-b483-6b88c06b4424",
+        "01a167f7-574f-78a2-9f24-2cc24ba37a9c",
+        "01a167f7-89ea-7eb0-838d-3c332bfd310f",
+        "01a167f7-5c86-7401-80ff-6be58f4946a0",
+        "01a167f7-9cc4-7152-aa09-b0c88b211206",
+        "01a167f7-bb62-7053-a523-08d277ffdce0",
+        "01a167f7-eb77-7f81-a47b-017468fd66cd",
+        "01a167f7-de0d-7ab3-b428-de91e4e1551b",
+        "01a167f8-19d5-7a81-809e-3f256161cfa9",
+        "01a167f7-c0bf-7983-aaa0-5932feaefc1a",
+        "01a167f8-211c-79e0-94d5-89645b6a8aa5",
+        "01a167f8-18f3-7933-8efa-457d2c86ff23",
+        "01a167f8-4d6a-7031-8a23-28da64859d28",
+        "01a167f8-59af-7cf1-ba69-a985d2648648",
+        "01a167f8-94b6-7682-a035-2469f918aa4e",
+        "01a167f8-6528-72f2-a263-0dc1154e3d30",
+        "01a167f8-953e-7303-bee4-216c8015281a",
+        "01a167f8-9b74-7552-adca-144f0e174434",
+        "01a167f8-e1a2-7753-8833-5af54176633d",
+        "01a167f8-c7b0-7203-a10f-898c1c8ebff1",
+        "01a167f8-f95a-7fa3-9881-fa979c2d646d",
+        "01a167f8-c245-76f3-94c6-1d2635a99ddd",
+        "01a167f9-0e7e-7853-bb30-7d206bfdffc6",
+        "01a167f9-130e-7673-9ceb-ca547ca8d24d",
+        "01a167f9-5276-7540-9bf7-d6d880bb444d",
+        "01a167f9-391f-79e0-b602-b18897ad8824",
+        "01a167f9-6f1a-7aa1-b1f5-cf5f3657e18a",
+        "01a167f9-44e9-7050-909e-144c4e28f6b2",
+        "01a167f9-7d89-74a2-a16d-8ed55d9ac8fc",
+        "01a167f9-8a9f-78d3-9842-f706f732b046",
+        "01a167f9-c0e5-7391-97ac-ba5e1eed5acb",
+        "01a167f9-a14f-7fb2-8a59-35be7b6c3708",
+        "01a167f9-f55c-7c61-ace5-584795c2261d",
+        "01a167f9-bd9f-7960-ad11-9e81a763ebd7",
+        "01a167fa-1689-7273-92fd-5128a8201403",
+        "01a167f9-f545-7c61-9586-32fbb19c978a",
+        "01a167fa-2ef4-7012-9f98-d77e6a646a09",
+        "01a167fa-25b4-74f3-8b5a-5e8dcc5cb5db",
+        "01a167fa-5abd-7941-94fb-2b69887c9511",
+        "01a167fa-4b57-7780-b32e-921640205a81",
+        "01a167fa-8540-70e0-b482-5b6245ce2ecb",
+        "01a167fb-0b46-7b20-af1d-e6fdd3eeb4f2",
+        "01a167fb-3fbc-7841-811b-4c629189e4da",
+        "01a167fb-0c7c-79c2-ad7d-1a5e2253d8a1",
+        "01a167fb-4b82-7361-82c3-499617850fc9",
+        "01a167fb-0b49-76f3-a433-5b4531c13d46",
+        "01a167fb-695a-7101-92aa-cdd921e290fd",
+        "01a167fb-7b32-7752-999a-ca23b697070e",
+        "01a167fb-ab3c-7022-811a-1252829089ca",
+        "01a167fb-9440-7481-a75a-501631b664ad",
+        "01a167fb-d3ea-7db1-a20c-63d06cfbeb88",
+        "01a167fb-b5ff-7470-845e-78ab002d6824",
+        "01a167fb-fa34-78d1-b2f8-34d13927176c",
+        "01a167fb-da44-7442-9b5f-2597234f64ff",
+        "01a167fc-0ef5-7880-be67-d4dd63c6a477",
+        "01a167fc-098c-7001-bb8b-c16eaec1cdbe",
+        "01a167fc-488c-7223-9e60-c618e8be88bb",
+        "01a167fc-4093-73d3-bcce-5304d1a44b64",
+        "01a167fc-7c92-7e43-843b-bea896ce3f9f",
+        "01a167fc-3a58-7123-9b3c-874708c5cfd7",
+        "01a167fc-8342-7271-a630-c32187f0d00c",
+        "01a167fc-900b-78b0-a187-961a5d0b05de",
+        "01a167fc-bf2b-7642-a93c-a913b437a813",
+        "01a167fc-a51a-7c40-bd01-ebf9f10e0a04",
+        "01a167fc-d45d-7a62-a9f5-0be6fc6bc33c",
+        "01a167fd-4c3b-7451-bc74-d6ab77baf65b",
+        "01a167fd-4c18-7a43-a3b6-54e7881e1efa",
+        "01a167fd-4c3b-7a01-81d9-4a3dc269faf3",
+        "01a167fd-9102-7d21-8b14-b2b5bccfa9ae",
+        "01a167fd-9609-7160-be7a-6d726daf883c",
+        "01a167fd-c0f6-76c2-962b-6cbb95c80dd4",
+        "01a167fd-9106-71c3-9afd-7c0454342233",
+        "01a167fd-ea93-72b0-b220-b75999abaea5",
+        "01a167fe-0cf0-7ca3-aaee-33ea76c7cd07",
+        "01a167fe-25e5-76e2-b562-59653248aaf3"
+      ],
+      "startedAt": "2026-10-23T08:53:15.834111Z",
+      "completedAt": "2026-10-23T09:01:26.711434Z",
+      "checks": [
+        {
+          "name": "paired-inputs",
+          "passed": true,
+          "detail": "36 paired questions plus ten predeclared with-recall repetitions; no output replacement."
+        },
+        {
+          "name": "fixed-model-config",
+          "passed": true,
+          "detail": "Same installed client SHA, requested gpt-6.1-sol/max and sanitized configuration in all82 fresh contexts; backend/temperature unsealed."
+        },
+        {
+          "name": "predeclared-rubric",
+          "passed": true,
+          "detail": "Protocol/corpora frozen before first answer; lexical scores unchanged, strict prose judged separately."
+        },
+        {
+          "name": "independent-scoring",
+          "passed": true,
+          "detail": "All82 actual paragraphs reviewed with scores and arm labels masked, then checked by parent; rejected first review retained. Agent review, not human."
+        },
+        {
+          "name": "negative-controls",
+          "passed": false,
+          "detail": "Strict acceptance not met: q08 omits present retention in trials1/3. q20 honest approval caveat remains incomplete because corpus lacks approval. Other finite safety/abstention controls pass."
+        }
+      ],
+      "evidence": [
+        {
+          "path": "subject.json",
+          "sha256": "a5b2d87ba87446c1f2f56e606b5c1a95acc3124dfccfea4d58bd08beee28dca3"
+        },
+        {
+          "path": "receipt-summary.json",
+          "sha256": "73258ea7518272cf0d6d5712b0d8a8179652459cb6518753aa342efe379542d3"
+        }
+      ],
+      "pairedCases": [
+        {
+          "id": "h01",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 15168.992,
+          "latencyWithoutMs": 13629.775,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h02",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 16342.265,
+          "latencyWithoutMs": 18666.813,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h03",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 19659.551,
+          "latencyWithoutMs": 24246.322,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h04",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.3333333333333333,
+          "latencyWithMs": 12283.805,
+          "latencyWithoutMs": 12020.201,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h05",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.3333333333333333,
+          "latencyWithMs": 13680.15,
+          "latencyWithoutMs": 16450.305,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h06",
+          "scoreWith": 0.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 17375.073,
+          "latencyWithoutMs": 16464.259,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h07",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 12776.628,
+          "latencyWithoutMs": 13361.546,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h08",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 16124.184,
+          "latencyWithoutMs": 18272.504,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h09",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 15853.241,
+          "latencyWithoutMs": 18284.81,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h10",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 15266.825,
+          "latencyWithoutMs": 10449.099,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h11",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 15384.55,
+          "latencyWithoutMs": 12064.942,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h12",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 12069.222,
+          "latencyWithoutMs": 12716.425,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q01",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 14048.057,
+          "latencyWithoutMs": 15515.835,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q02",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 12757.717,
+          "latencyWithoutMs": 16168.324,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q03",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.5,
+          "latencyWithMs": 14443.541,
+          "latencyWithoutMs": 15436.608,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q04",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 13072.566,
+          "latencyWithoutMs": 13782.025,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q05",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 16594.596,
+          "latencyWithoutMs": 17228.216,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q06",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 11463.152,
+          "latencyWithoutMs": 13235.038,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q07",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 11834.675,
+          "latencyWithoutMs": 12175.351,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q08",
+          "scoreWith": 0.5,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 24912.259,
+          "latencyWithoutMs": 17412.456,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q09",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 16272.196,
+          "latencyWithoutMs": 15284.374,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q10",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.3333333333333333,
+          "latencyWithMs": 13419.809,
+          "latencyWithoutMs": 19909.804,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q11",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.3333333333333333,
+          "latencyWithMs": 11565.593,
+          "latencyWithoutMs": 15141.767,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q12",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 12190.945,
+          "latencyWithoutMs": 12949.941,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q13",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 12529.215,
+          "latencyWithoutMs": 17902.777,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q14",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 19567.725,
+          "latencyWithoutMs": 13956.781,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q15",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 16425.966,
+          "latencyWithoutMs": 12584.773,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q16",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 16370.564,
+          "latencyWithoutMs": 14367.936,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q17",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 13326.022,
+          "latencyWithoutMs": 13330.882,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q18",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 14486.045,
+          "latencyWithoutMs": 16386.377,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q19",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 13014.995,
+          "latencyWithoutMs": 13763.322,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q20",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 21159.949,
+          "latencyWithoutMs": 12529.739,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q21",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 13583.427,
+          "latencyWithoutMs": 22640.152,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q22",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 15077.443,
+          "latencyWithoutMs": 12619.355,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q23",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 11549.91,
+          "latencyWithoutMs": 13653.694,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q24",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 14823.983,
+          "latencyWithoutMs": 16150.254,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        }
+      ],
+      "costUnit": "paid-api-calls",
+      "error": null
+    }
+  }
+}

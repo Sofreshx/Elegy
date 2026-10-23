@@ -1,0 +1,43 @@
+{
+  "answer": "Le label de routage du sac enregistré pour Quill n’est pas disponible dans les données fournies.",
+  "threadId": "01a1686f-bb61-77b0-a0b9-a44dac5800f8",
+  "usage": {
+    "input_tokens": 26327,
+    "cached_input_tokens": 21504,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 267,
+    "reasoning_output_tokens": 240
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a1686f-bb61-77b0-a0b9-a44dac5800f8\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Le label de routage du sac enregistré pour Quill n’est pas disponible dans les données fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26327,\"cached_input_tokens\":21504,\"cache_write_input_tokens\":0,\"output_tokens\":267,\"reasoning_output_tokens\":240}}\n",
+  "stderr": "2026-10-23T11:05:15.376218Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q24",
+  "arm": "without",
+  "startedAt": "2026-10-23T11:05:14.949751+00:00",
+  "completedAt": "2026-10-23T11:05:28.066008+00:00",
+  "elapsedMs": 13116.627,
+  "promptSha256": "1a0ee763569fecda1f0da74fc7443a101baa7beeff810d2d62bfa8c39d5c8f4d",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

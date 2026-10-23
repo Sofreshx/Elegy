@@ -53,7 +53,7 @@ time = { version = "0.3.41", features = ["formatting"] }
 tokio = { version = "1.44.1", features = ["macros", "rt-multi-thread", "io-std", "io-util", "sync", "time", "process"] }
 toml = "0.8.20"
 url = { version = "2.5.4", features = ["serde"] }
-zip = { version = "2.4.2", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.0", default-features = false, features = ["deflate"] }
 arboard = "3.4"
 png = "0.17"
 sysinfo = "0.33"

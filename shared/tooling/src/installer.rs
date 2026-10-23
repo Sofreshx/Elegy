@@ -147,7 +147,7 @@ fn install_from_archive_with_identity_and_source(
     let mut manifest: Option<InstallableManifest> = None;
     let mut manifest_index = None;
     for i in 0..archive.len() {
-        let name = archive.by_index(i)?.name().to_string();
+        let name = archive.by_index(i)?.name()?.into_owned();
         if name == "plugin.json" {
             if manifest.is_some() {
                 return Err(InstallError::InvalidManifest(
@@ -224,7 +224,7 @@ fn install_from_archive_with_identity_and_source(
             continue;
         }
         let entry = archive.by_index(i)?;
-        let entry_name = entry.name().to_string();
+        let entry_name = entry.name()?.into_owned();
         if entry_name.ends_with('/') {
             continue;
         }
@@ -533,6 +533,43 @@ mod tests {
         zip.finish().expect("finish zip");
     }
 
+    fn write_malformed_filename_length_zip(path: &std::path::Path) {
+        write_zip(
+            path,
+            &[
+                (
+                    "plugin.json",
+                    r#"{"schemaVersion":"elegy-plugin/v1","name":"safe-plugin","version":"0.1.0","description":"desc","skills":"./skills/"}"#,
+                ),
+                ("bad-name.txt", "nope"),
+            ],
+        );
+
+        let mut bytes = fs::read(path).expect("read zip");
+        let filename = b"bad-name.txt";
+        let mut search_from = 0;
+        let mut central_headers = 0;
+        while let Some(relative) = bytes[search_from..]
+            .windows(filename.len())
+            .position(|window| window == filename)
+        {
+            let name_offset = search_from + relative;
+            let header_offset = bytes[..name_offset]
+                .windows(4)
+                .rposition(|window| window == b"PK\x03\x04" || window == b"PK\x01\x02")
+                .expect("zip header before entry name");
+            if bytes[header_offset..].starts_with(b"PK\x01\x02") {
+                let filename_length_offset = header_offset + 28;
+                bytes[filename_length_offset..filename_length_offset + 2]
+                    .copy_from_slice(&u16::MAX.to_le_bytes());
+                central_headers += 1;
+            }
+            search_from = name_offset + filename.len();
+        }
+        assert_eq!(central_headers, 1, "central directory filename");
+        fs::write(path, bytes).expect("write invalid zip");
+    }
+
     fn write_plugin_fixture(root: &std::path::Path, name: &str, description: &str) {
         fs::create_dir_all(root.join(".elegy-plugin")).expect("create manifest dir");
         fs::create_dir_all(root.join("skills").join(name)).expect("create skill dir");
@@ -579,6 +616,26 @@ mod tests {
         assert!(
             matches!(err, InstallError::InvalidManifest(ref message) if message.contains("escapes the install root")),
             "unexpected error: {err}"
+        );
+        assert!(!temp.path().join("safe-plugin").exists());
+    }
+
+    #[test]
+    fn install_rejects_malformed_entry_filename_before_writing() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let archive_path = temp.path().join("invalid-name.plugin.zip");
+        write_malformed_filename_length_zip(&archive_path);
+
+        let archive = fs::File::open(&archive_path).expect("open malformed zip");
+        assert!(
+            zip::ZipArchive::new(archive).is_err(),
+            "malformed central filename length must be rejected"
+        );
+
+        let err = install_from_archive(&archive_path, temp.path()).expect_err("must fail");
+        assert!(
+            matches!(err, InstallError::Zip(_)),
+            "unexpected error: {err:?}"
         );
         assert!(!temp.path().join("safe-plugin").exists());
     }

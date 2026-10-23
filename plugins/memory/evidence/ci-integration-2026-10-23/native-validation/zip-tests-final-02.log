@@ -1,0 +1,285 @@
+
+running 6 tests
+test native_host_tests::live_github_proof_requires_explicit_read_only_consent ... ok
+test native_host_tests::bundled_action_tools_bind_client_purpose_and_provider_outside_llm_arguments ... ok
+test native_host_tests::accepts_discovery_hint_but_rejects_any_secret_bearing_message ... ok
+test native_host_tests::local_client_and_ui_mutation_boundaries_fail_closed ... ok
+test native_host_tests::github_device_flow_matches_provider_contract_without_exposing_secrets ... ok
+test native_host_tests::live_proof_secret_scan_includes_nested_sqlite_sidecars ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+
+running 15 tests
+test agent_surface_has_account_tools_but_no_secret_or_raw_execution_tool ... ok
+test live_proof_rejects_a_source_binary_before_accessing_any_account ... ok
+test open_can_return_the_local_center_url_without_launching ... ok
+test action_mcp_advertises_only_the_bundled_typed_read_operations ... ok
+test open_can_target_a_durable_request_without_putting_secrets_in_the_url ... ok
+test mcp_server_advertises_only_the_bounded_account_tools ... ok
+test action_mcp_executes_a_typed_read_through_the_running_broker ... ok
+test unknown_commands_fail_closed ... ok
+test status_is_machine_readable_and_secret_free ... ok
+test packaged_accounts_archive_preserves_surface_and_advertises_all_tools has been running for over 60 seconds
+test packaged_live_proof_calls_declared_mcp_and_proves_post_disconnect_failure has been running for over 60 seconds
+test packaged_live_proof_never_falls_back_to_github_cli_credentials has been running for over 60 seconds
+test packaged_live_proof_requires_a_dedicated_device_flow_client has been running for over 60 seconds
+test packaged_live_proof_requires_an_explicit_isolated_data_root has been running for over 60 seconds
+test packaged_live_proof_waits_for_device_flow_and_matching_action_approval has been running for over 60 seconds
+test packaged_live_proof_requires_a_dedicated_device_flow_client ... ok
+test packaged_live_proof_requires_an_explicit_isolated_data_root ... ok
+test packaged_live_proof_waits_for_device_flow_and_matching_action_approval ... ok
+test packaged_accounts_archive_preserves_surface_and_advertises_all_tools ... ok
+test packaged_live_proof_calls_declared_mcp_and_proves_post_disconnect_failure ... ok
+test packaged_live_proof_never_falls_back_to_github_cli_credentials ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 158.20s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 8 tests
+test upstream_mcp_contract_fixtures_validate_through_core_facade ... ok
+test upstream_agent_contract_fixtures_validate_through_core_facade ... ok
+test fs_static_example_validates ... ok
+test duplicate_resource_uris_are_rejected ... ok
+test http_openapi_example_still_rejects_openapi_runtime_execution ... ok
+test compose_runtime_state_exposes_runtime_mcp_consumers_through_core ... ok
+test http_example_catalog_is_deterministic ... ok
+test fs_static_example_catalog_is_deterministic ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+
+running 71 tests
+test tests::build_codex_apps_from_catalog_returns_none_without_app_bindings ... ok
+test tests::build_codex_apps_from_catalog_extracts_app_bindings ... ok
+test tests::analyze_tool_without_schema_marks_invalid ... ok
+test tests::capability_catalog_kind_defaults_to_cli_on_deserialize ... ok
+test tests::analyze_tool_with_valid_schema_extracts_triggers_and_marks_valid ... ok
+test tests::analyze_mixed_tools_returns_correct_count_and_results ... ok
+test tests::capability_catalog_rejects_app_binding_fallback ... ok
+test tests::capability_catalog_rejects_app_binding_without_app_binding_field ... ok
+test tests::capability_catalog_rejects_duplicate_ids ... ok
+test tests::capability_catalog_rejects_cli_with_empty_executable ... ok
+test tests::capability_catalog_rejects_cli_without_invocation ... ok
+test tests::capability_catalog_validates_all_kinds ... ok
+test tests::codex_apps_use_explicit_opaque_connection_bindings ... ok
+test tests::capability_catalog_v2_rejects_legacy_fallback_and_app_binding_fields ... ok
+test tests::capability_catalog_v2_accepts_only_concrete_kinds_and_kind_fields ... ok
+test tests::capability_catalog_loader_dispatches_v1_and_v2 ... ok
+test tests::codex_import_v3_preserves_flexible_native_shapes ... ok
+test tests::analyze_and_generate_skills_from_descriptor_file ... ok
+test tests::author_mcp_descriptor_writes_valid_json ... ok
+test tests::export_plugin_v1_includes_explicit_binary ... ok
+test tests::export_plugin_v1_codex_generates_app_json_from_catalog ... ok
+test tests::export_plugin_v1_opencode ... ok
+test tests::generated_plugin_schemas_include_connection_contracts ... ok
+test tests::export_plugin_v1_wraps_a_root_skill_with_its_support_files ... ok
+test tests::export_plugin_v1_codex_version_digest_changes_when_projection_changes ... ok
+test tests::generated_schema_artifacts_include_marketplace_v2 ... ok
+test tests::marketplace_allows_no_plugins_when_no_surface_is_agent_routable ... ok
+test tests::generated_schema_artifacts_include_strict_plugin_v3 ... ok
+test tests::generated_plugin_schemas_match_checked_in_artifacts ... ok
+test tests::marketplace_v2_rejects_unsafe_or_duplicate_artifacts ... ok
+test tests::export_plugin_v1_codex_emits_apps_hooks_interface_and_assets ... ok
+test tests::export_plugin_v2_never_infers_codex_apps_from_legacy_catalog_slugs ... ok
+test tests::marketplace_validation_rejects_unsafe_and_duplicate_entries ... ok
+test tests::missing_readiness_is_backward_compatible_but_not_agent_routable ... ok
+test tests::marketplace_v2_supports_codex_source_and_policy_parity ... ok
+test tests::marketplace_validation_and_target_selection_are_deterministic ... ok
+test tests::package_relative_paths_use_portable_dot_slash_form ... ok
+test tests::plaintext_authentication_scan_rejects_basic_and_opaque_token_headers ... ok
+test tests::import_codex_plugin_v1_preserves_codex_specific_fields ... ok
+test tests::export_plugin_v2_generates_codex_apps_from_connection_requirements ... ok
+test tests::plugin_v2_accepts_an_explicit_connectionless_declaration ... ok
+test tests::plugin_v2_requires_a_safe_readiness_reference ... ok
+test tests::plugin_v2_requires_an_explicit_connection_declaration ... ok
+test tests::plugin_v2_inspection_reports_connection_requirements ... ok
+test tests::pack_plugin_v1_rejects_duplicate_archive_targets ... ok
+test tests::pack_plugin_v1_with_binary_includes_compiled_binary ... ok
+test tests::host_exports_preserve_portable_manifest_and_capability_catalog ... ok
+test tests::plugin_v2_verification_rejects_mismatched_connection_authority ... ok
+test tests::plugin_v3_rejects_authentication_without_an_mcp_server_source ... ok
+test tests::plugin_v3_projects_codex_native_fields_without_loss ... ok
+test tests::plugin_v3_rejects_plaintext_authentication_material ... ok
+test tests::plugin_v2_verification_requires_codex_bindings_for_projected_connections ... ok
+test tests::plugin_v2_verification_requires_the_declared_connection_file ... ok
+test tests::plugin_v3_rejects_http_mcp_without_declared_authentication ... ok
+test tests::plugin_validation_allows_root_skill_only_path ... ok
+test tests::production_readiness_requires_release_and_consumer_evidence ... ok
+test tests::v1_mcp_with_tool_name_migrates_to_mcp_tool_without_resource_inference ... ok
+test tests::v2_plugin_requires_typed_capability_catalog ... ok
+test tests::pack_plugin_includes_readiness_and_evidence_authority ... ok
+test tests::usable_readiness_requires_clean_install_and_non_fixture_real_task_evidence ... ok
+test tests::v3_rejects_malformed_codex_shapes_and_unknown_surface_classes ... ok
+test tests::validate_plugin_v1_rejects_wrong_codex_extension_schema_version ... ok
+test tests::validate_plugin_v1_allows_explicit_marketplace_wrapper ... ok
+test tests::plugin_v2_verification_validates_the_connection_provider_descriptor ... ok
+test tests::plugin_v3_verification_checks_governed_files ... ok
+test tests::verify_plugin_v1_rejects_invalid_codex_apps_and_hooks ... ok
+test tests::plugin_verification_rejects_readiness_that_does_not_match_manifest ... ok
+test tests::verify_inspect_plugin_v1_fixture ... ok
+test tests::verify_plugin_v1_rejects_malformed_declared_surfaces ... ok
+test tests::plugin_v3_codex_export_is_lossless_and_other_hosts_fail_closed ... ok
+test tests::pack_plugin_v3_includes_governance_and_package_assets ... ok
+
+test result: ok. 71 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test cli_invocations_round_trip_input_and_output_schemas ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+
+running 12 tests
+test canonical_json_digest_is_stable_for_the_same_value ... ok
+test rejects_duplicate_capabilities_in_an_agent_lock ... ok
+test rejects_package_paths_that_escape_the_package_root ... ok
+test package_file_digests_and_release_provenance_are_validated ... ok
+test rejects_platform_specific_backslash_package_paths ... ok
+test validates_an_exact_agent_lock ... ok
+test validates_a_host_neutral_package_manifest ... ok
+test validates_a_deterministic_sbom_contract ... ok
+test generates_package_and_lock_schema_artifacts ... ok
+test pack_rejects_archive_output_that_overwrites_package_inputs ... ok
+test packs_and_verifies_an_independent_capability_package ... ok
+test package_archives_are_byte_for_byte_reproducible ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+
+running 1 test
+test capability_installer::tests::executable_permissions_follow_entrypoint_paths_not_file_roles ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 18 tests
+test installer::tests::checksum_mismatch_fails_closed ... ok
+test tests::default_marketplace_routing_excludes_missing_and_implemented_readiness ... ok
+test tests::default_marketplace_routing_includes_usable_readiness ... ok
+test installer::tests::install_rejects_path_traversal_entries ... ok
+test tests::descriptor_only_marketplace_sources_load_but_remain_non_routable ... ok
+test installer::tests::install_rejects_unexpected_marketplace_identity_before_writing ... ok
+test installer::tests::install_rejects_duplicate_entries_before_writing ... ok
+test tests::marketplace_publication_rejects_legacy_plugin_manifests ... ok
+test tests::marketplace_target_selection_rejects_unsupported_platform ... ok
+test tests::old_install_receipts_parse_without_new_metadata ... ok
+test installer::tests::install_normalizes_legacy_component_paths_and_writes_manifest ... ok
+test installer::tests::install_rejects_malformed_entry_filename_before_writing ... ok
+test tests::target_mcp_commands_accept_windows_exe_command ... ok
+test tests::target_mcp_commands_reject_extensionless_windows_bin_command ... ok
+test tests::external_wrapper_projection_declares_windows_binary_and_mcp_rewrite ... ok
+test installer::tests::packed_plugin_installs_with_receipt ... ok
+test tests::marketplace_status_reports_not_installed_current_and_stale ... ok
+test tests::explicit_incubating_discovery_uses_project_catalog_without_rewriting_default ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+
+running 1 test
+test accounts_plugin_is_a_portable_bundled_capability ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 8 tests
+test test_runs_the_host_neutral_contract_checks ... ok
+test check_rejects_a_cli_capability_without_schemas ... ok
+test init_creates_a_host_neutral_package_scaffold ... ok
+test pack_records_release_provenance_in_the_manifest_and_sbom ... ok
+test check_and_pack_accept_a_complete_host_neutral_package ... ok
+test project_generates_host_bindings_from_the_same_catalog ... ok
+test pack_refreshes_file_digests_after_declared_file_changes ... ok
+test lock_create_install_and_verify_pin_one_exact_package ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.74s
+
+
+running 4 tests
+test install_rejects_archive_digest_drift_before_writing ... ok
+test install_rejects_executable_digest_drift_before_writing ... ok
+test install_and_verify_use_the_exact_lock_and_file_hashes ... ok
+test updates_are_integrity_checked_and_uninstall_is_lock_guarded ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+
+running 6 tests
+test generated_marketplace_points_to_matching_plugin_manifests ... ok
+test generated_marketplace_is_valid ... ok
+test domain_products_are_not_registered_as_plugins ... ok
+test generated_marketplace_matches_packaged_surfaces ... ok
+test standalone_surfaces_declare_readiness_authority ... ok
+test distribution_catalog_uses_explicit_surface_roles ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+--- stderr ---
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.19s
+     Running unittests src\main.rs (<local-path>)
+     Running tests\agent_surface.rs (<local-path>)
+Live proof: packaged broker healthy.
+Live proof: connect the dedicated GitHub account in Account Center at http://127.0.0.1:56607/.
+Live proof: connected GitHub identity verified by Account Center.
+Live proof: packaged Actions MCP initialized.
+Live proof: github_profile_read advertised.
+Live proof: approve the github.profile.read request in Account Center at http://127.0.0.1:56607/?request=access_5e56b5db6a99428ba8cda6785def5a66.
+Live proof: real GitHub profile call completed through packaged MCP.
+Live proof: local proof connection removed.
+Live proof: post-disconnect MCP call returned.
+Live proof: Actions MCP stopped.
+Live proof: broker stopped.
+     Running unittests src\lib.rs (<local-path>)
+     Running unittests src\main.rs (<local-path>)
+     Running tests\bootstrap_slice.rs (<local-path>)
+     Running unittests src\lib.rs (<local-path>)
+     Running unittests src\bin\elegy-plugin-schemas.rs (<local-path>)
+     Running tests\capability_catalog_contract.rs (<local-path>)
+     Running tests\capability_package_contract.rs (<local-path>)
+     Running unittests src\lib.rs (<local-path>)
+     Running unittests src\elegy.rs (<local-path>)
+     Running unittests src\main.rs (<local-path>)
+     Running tests\accounts_plugin_contract.rs (<local-path>)
+     Running tests\capability_cli.rs (<local-path>)
+     Running tests\capability_install.rs (<local-path>)
+     Running tests\marketplace_conformance.rs (<local-path>)
+   Doc-tests elegy_core
+   Doc-tests elegy_plugin_sdk
+   Doc-tests elegy_tooling

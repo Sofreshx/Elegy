@@ -1,0 +1,11 @@
+{
+  "status": "corrected-output-location",
+  "reason": "Runner wrote new historical-Q6 rechecks to the wrong evidence directory. No existing Q5 file was modified. Exact executed argv in local-checks-02.json is retained; these files were relocated byte-for-byte to the intended CI evidence directory.",
+  "files": [
+    {
+      "originalPath": "plugins/memory/evidence/fixture-adequacy-2026-10-23/native-validation/q6-recheck-02.json",
+      "currentPath": "plugins/memory/evidence/ci-integration-2026-10-23/native-validation/q6-recheck-02.json",
+      "sha256": "20e4b18d36c43585a0f5d1d3222e497a51167dbfffdd8ead5e8e453e48003e7e"
+    }
+  ]
+}

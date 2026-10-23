@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "memory-model-execution-checks/v1",
+  "sourceRevision": "95bf15ba2afa8e7655c45a8127b6a060893b695a",
+  "subjectSha256": "01d2d162639b7aace41503649d18e3517c5ef1ddf81fc2266f42214ed7fd1d8c",
+  "protocolSha256": "1bbd5610dce3373568f789a112024d951e86f83f9f7d4f61736304e36a6fe6be",
+  "status": "execution-valid",
+  "errors": [],
+  "counts": {
+    "answers-primary": 50,
+    "answers-transfer": 24,
+    "repeats": 10
+  },
+  "threadCount": 84,
+  "configurationSha256": [
+    "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6"
+  ],
+  "qualityVerdict": "pending independent prose review; execution validity is not answer quality"
+}

@@ -1,0 +1,43 @@
+{
+  "answer": "Les informations disponibles ne documentent aucune approbation actuelle de la région ni du tag de rollback de Vesper-West. Elles renseignent ces paramètres, mais leur statut d’approbation reste inconnu.",
+  "threadId": "01a1686f-359e-75f1-bfac-6bb346d8ebf8",
+  "usage": {
+    "input_tokens": 26512,
+    "cached_input_tokens": 21504,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 381,
+    "reasoning_output_tokens": 334
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a1686f-359e-75f1-bfac-6bb346d8ebf8\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Les informations disponibles ne documentent aucune approbation actuelle de la région ni du tag de rollback de Vesper-West. Elles renseignent ces paramètres, mais leur statut d’approbation reste inconnu.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26512,\"cached_input_tokens\":21504,\"cache_write_input_tokens\":0,\"output_tokens\":381,\"reasoning_output_tokens\":334}}\n",
+  "stderr": "2026-10-23T11:04:41.133563Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q25",
+  "arm": "with",
+  "startedAt": "2026-10-23T11:04:40.709684+00:00",
+  "completedAt": "2026-10-23T11:04:58.001385+00:00",
+  "elapsedMs": 17291.97,
+  "promptSha256": "f1b98c415581ea2c94164d0c6c1f9e11d34639d9c1ca52fc07a10da23c1ac3d9",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

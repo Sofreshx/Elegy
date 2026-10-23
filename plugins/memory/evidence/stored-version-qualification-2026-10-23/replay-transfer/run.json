@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "memory-generic-replay/v1",
+  "startedAt": "2026-10-23T10:58:40.384975+00:00",
+  "status": "completed",
+  "sourceRevision": "95bf15ba2afa8e7655c45a8127b6a060893b695a",
+  "cliSha256": "b9c6e9de11754ca55f2f5f9c6530bf83d871357eef352ca87b0be73ef3d8f676",
+  "mcpSha256": "9083f13f079e3028b15a56db0813890d826f61c8702cbd2e984dfc6b149851fe",
+  "corpusSha256": "6987ed6bb624648d73dad0272de3d602c47b20af5b868017a76aaa4b06a7e893",
+  "protocolSha256": "1bbd5610dce3373568f789a112024d951e86f83f9f7d4f61736304e36a6fe6be",
+  "runnerSha256": "0af3c61bd27151e9b2e2d8c2a92b8925411f35cdc0e548a747576dc9dd045c30",
+  "answerRunnerSha256": "9bd417a00518bccc0d61e75908996e0bdc80b62db9a6b96e8e278f831994ae0b",
+  "runReplaySha256": "1581b08a921e4dca1bec1207ceed384d883f6061319c3edc519d25a97eed4d1f",
+  "gradeSha256": "bf330b80fa97bc734f73e4a8c3c9257201ba12fb0ecbc52277b2e46bbb78cf54",
+  "rpcSupportSha256": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759",
+  "episodes": [
+    {
+      "id": "nacre",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "3d3abeafc2bf1bf7fbc15090e0364cc2584b821eed6913362e0945756c0b0ce9",
+      "error": null
+    },
+    {
+      "id": "quartz",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "c73f607267d7f987792c44c709e7693b9f7ee797e75139c660344d355c0cc2b8",
+      "error": null
+    },
+    {
+      "id": "brume",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "ccf925449f12eef86f095ff195ea97c44916f8f28aa13850728aef627f140a1b",
+      "error": null
+    },
+    {
+      "id": "mistral",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "1400525f71f4855e62ce3457a86e1000c81a405a2bc12b8b757198c66e4fb264",
+      "error": null
+    }
+  ],
+  "completedAt": "2026-10-23T10:58:53.400520+00:00",
+  "cliSha256After": "b9c6e9de11754ca55f2f5f9c6530bf83d871357eef352ca87b0be73ef3d8f676",
+  "mcpSha256After": "9083f13f079e3028b15a56db0813890d826f61c8702cbd2e984dfc6b149851fe"
+}

@@ -1,0 +1,589 @@
+{
+  "sha256": "b305acef3d13a71a3767a096ef4f1834a96823f57c0c927e8f3db3792a69aa2f",
+  "receipt": {
+    "schemaVersion": "memory-qualification/v1",
+    "id": "488792f5-fcb6-426b-b151-8b23716ae0f6",
+    "sequence": 1,
+    "claimId": "recall.answer-quality",
+    "protocolSha256": "dc53bc58625e00a30abbe63fdb37e0597339860d6be48a1f901803709b3b1e07",
+    "createdAt": "2026-10-23T13:52:53.201887100Z",
+    "context": {
+      "sourceSha256": "1742beff51d26ca32749e7b70ef7cce365f6ed4d3636f5c5e7116a4ecd0783ba",
+      "buildSourceSha256": "1742beff51d26ca32749e7b70ef7cce365f6ed4d3636f5c5e7116a4ecd0783ba",
+      "executableSha256": "55b76918b44dc1e556a027f444d0c47c8e1175bae6d3d7a59df1fc274917afd6",
+      "gitRevision": "90094e9147824fe9a70c9b45ee29e3d92fb74b25",
+      "dirty": true,
+      "os": "windows",
+      "arch": "x86_64"
+    },
+    "provenance": "external-observation",
+    "outcome": "satisfied",
+    "checks": [
+      {
+        "name": "paired-inputs",
+        "passed": true,
+        "detail": "37predeclared paired questions (25primary,12transfer), plus10critical with-recall repeats.84unique ephemeral threads; no answer replacement/retry."
+      },
+      {
+        "name": "fixed-model-config",
+        "passed": true,
+        "detail": "Installed client SHA unchanged; requestedgpt-6.1-sol/max, same sanitized instruction/configuration in every arm. Existing ChatGPT authentication only, no paid API; backend/model alias not sealed."
+      },
+      {
+        "name": "predeclared-rubric",
+        "passed": true,
+        "detail": "Source5eb34e0 and new binaries bound; Q7 protocol/corpus/subject/eight qualification code hashes frozen in90094e9 before all84answers. Complete Q6 corpus/rubric reused unchanged; earlier adverse results retained."
+      },
+      {
+        "name": "independent-scoring",
+        "passed": true,
+        "detail": "All84actual paragraphs read in two independent masked42-row batches, then parent. Exact whole input/per-row hashes bound. Five unknown/hostile-target completeness review errors corrected under the frozen rubric with originals/addenda retained; no model rerun. Non-human review."
+      },
+      {
+        "name": "negative-controls",
+        "passed": true,
+        "detail": "All47with-recall outputs complete/grounded/control/format-correct; all37without safe,14complete and23appropriately incomplete. Unknown approval, hostile exposure, current priority, close-context names, deletion/foreign controls pass.37source packets unchanged;24namespaces cleaned."
+      },
+      {
+        "name": "mean-quality-improves",
+        "passed": true,
+        "detail": "Mean paired normalized score must strictly improve; limited to this sample."
+      }
+    ],
+    "measurements": {
+      "costUnit": "paid-api-calls",
+      "meanScoreImprovement": 0.572072072072072,
+      "pairedCaseCount": 37
+    },
+    "durationMs": 444100,
+    "observation": {
+      "schemaVersion": "memory-observation/v1",
+      "claimId": "recall.answer-quality",
+      "protocolVersion": 1,
+      "subject": {
+        "artifactSha256": "55b76918b44dc1e556a027f444d0c47c8e1175bae6d3d7a59df1fc274917afd6",
+        "host": "Installed Codex CLI; gpt-6.1-sol/max; explicit isolated lexical Memory packets",
+        "hostVersion": "codex-cli 0.163.0-alpha.11",
+        "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6"
+      },
+      "sessions": [
+        "01a168f6-47d8-7392-800d-d7db219e68c4",
+        "01a168f6-86b4-7a63-8899-67efa2ea8b59",
+        "01a168f6-47cf-73a1-8f47-d4c63728dc44",
+        "01a168f6-8830-73c2-8fff-94ce66e456c5",
+        "01a168f6-47d2-7c52-a588-d4576529a93f",
+        "01a168f6-7916-72b3-ab47-01a0de8d7b76",
+        "01a168f6-b565-7d21-84a3-9b8c6cd706de",
+        "01a168f6-e9aa-7243-ba7c-4b94d2470c4a",
+        "01a168f6-b177-7c01-9f27-e54ba6e79f18",
+        "01a168f6-e22c-7831-aa74-67bece2e7a98",
+        "01a168f6-c40c-7832-881d-3cb256923b2f",
+        "01a168f6-f7be-7571-9870-032ba0546da2",
+        "01a168f7-1791-7221-a14d-dd2dd56fb88d",
+        "01a168f7-4cee-75a3-972f-1e15098aebb2",
+        "01a168f7-2037-79e2-8960-eb9d5db51dbb",
+        "01a168f7-575a-7252-afe2-46114cc677fe",
+        "01a168f7-28bd-7163-adcb-4bf665d3c532",
+        "01a168f7-66bb-7b43-8ed3-cb7d597cc86e",
+        "01a168f7-a24c-79f1-a084-7b11b8ea0986",
+        "01a168f7-de7a-7163-ade2-b861ba5e614c",
+        "01a168f7-ae25-7ed1-9198-6588946e2a59",
+        "01a168f7-ec13-75f1-ad9d-6a6b29894b61",
+        "01a168f7-7a13-7330-bfa5-5caa3aa44747",
+        "01a168f7-a030-7b53-bb15-061f4b5fb7a0",
+        "01a168f8-0b8a-7b21-bd3c-3d0532d7dc27",
+        "01a168f8-4176-7873-a253-84e78ede7d1c",
+        "01a168f8-2186-7203-a69a-a2ca7b082f31",
+        "01a168f8-45fa-7093-ba97-6105ae0cca99",
+        "01a168f8-3493-76a2-ab6e-06f75edc924f",
+        "01a168f8-631c-7ef2-8edc-70a7722298e4",
+        "01a168f8-7d81-79c1-bf0d-ba54af0f8dae",
+        "01a168f8-b08f-7ae1-9b3d-119be0e6b36e",
+        "01a168f8-70e5-76b0-b588-b2ca312bc57b",
+        "01a168f8-9f94-7ed2-bada-65917824f851",
+        "01a168f8-a374-7583-893a-1a722cd02efa",
+        "01a168f8-e03c-70c3-bf8e-04adef59a4e7",
+        "01a168f8-df97-7592-a591-6f9dbec8989c",
+        "01a168f9-1705-7392-af19-3a300f01db22",
+        "01a168f8-e862-7ef0-b9b4-b7927f187771",
+        "01a168f9-1f12-7221-b76f-fd83116eb2a3",
+        "01a168f9-1620-7a90-bd36-5ddf135015cc",
+        "01a168f9-528f-7571-8c45-66c357bc0465",
+        "01a168f9-596b-7b62-bcf7-e224faf36166",
+        "01a168f9-934b-7e42-8cfd-fed4b0af6e50",
+        "01a168f9-6105-70a3-8da5-deba20d564db",
+        "01a168f9-94a4-78c2-be2d-082b10cee9b3",
+        "01a168f9-99db-73f0-95d1-8625d611f39a",
+        "01a168f9-c9b2-7642-9f59-847e3ebf807c",
+        "01a168f9-c2d0-7fa3-ae18-ba7a41bf2cc5",
+        "01a168f9-f27e-78c3-bbad-6dca7a566384",
+        "01a168fa-4e30-7f61-9377-a63a84dc276a",
+        "01a168fa-8849-7ef1-bf85-56c797d442a1",
+        "01a168fa-4e07-7593-b338-63c000828ecd",
+        "01a168fa-7c16-7ac2-b839-1160873d0e8e",
+        "01a168fa-4e2d-79d0-b3ce-cc204995a0b3",
+        "01a168fa-8df5-73c1-af15-652d28ab0cc7",
+        "01a168fa-b1cb-7780-8a71-d26b95c72b5c",
+        "01a168fa-e07d-7261-88d5-3cd4f3cb9a19",
+        "01a168fa-c44d-7571-954d-91fd437aea86",
+        "01a168fa-fbfe-79d1-bede-eb08797d1e7d",
+        "01a168fa-bcf3-7743-a0a4-5dca1c823057",
+        "01a168fb-0336-7de2-913f-eb490f779d9e",
+        "01a168fb-14b2-7800-85f6-5754d07f58df",
+        "01a168fb-4eb2-71c0-a677-779bedbbdda2",
+        "01a168fb-34e7-7ae3-8c4f-8fb4ae0deb71",
+        "01a168fb-65f2-7f82-a6e7-10a0800daed5",
+        "01a168fb-2b02-7a32-aede-0f79c839cc84",
+        "01a168fb-6d0d-7560-9dfa-9b0f4d6b2617",
+        "01a168fb-836f-79a2-9f00-30f38180164b",
+        "01a168fb-aec1-7c30-9d18-bff8a8458831",
+        "01a168fb-9a42-77a2-a3e9-9898936e140f",
+        "01a168fb-ca4e-7103-b19e-8b0f2cccafd3",
+        "01a168fb-9e88-7a80-92f0-d0030d982d4d",
+        "01a168fb-d199-7f01-9924-88f65a5ef759",
+        "01a168fc-2fa7-7923-9efe-a7b02442061b",
+        "01a168fc-2fc7-7ed2-8d3e-322a9041fb34",
+        "01a168fc-2fc4-7633-aec8-e6b885e5eac4",
+        "01a168fc-67c6-7990-9d7c-0e4e67f9ddcc",
+        "01a168fc-6f62-7b92-a1f7-dc956c2697f7",
+        "01a168fc-7f53-78a1-9208-d0e0fd0bc9bb",
+        "01a168fc-9c63-7fd1-8aa5-fad546d8413a",
+        "01a168fc-a6ba-7351-a7a3-5f3a74052145",
+        "01a168fc-b76f-7a50-a75b-4f5cef10bcd1",
+        "01a168fc-d410-76b3-9b7b-6907d42b786d"
+      ],
+      "startedAt": "2026-10-23T13:32:12.307963Z",
+      "completedAt": "2026-10-23T13:39:36.408497Z",
+      "checks": [
+        {
+          "name": "paired-inputs",
+          "passed": true,
+          "detail": "37predeclared paired questions (25primary,12transfer), plus10critical with-recall repeats.84unique ephemeral threads; no answer replacement/retry."
+        },
+        {
+          "name": "fixed-model-config",
+          "passed": true,
+          "detail": "Installed client SHA unchanged; requestedgpt-6.1-sol/max, same sanitized instruction/configuration in every arm. Existing ChatGPT authentication only, no paid API; backend/model alias not sealed."
+        },
+        {
+          "name": "predeclared-rubric",
+          "passed": true,
+          "detail": "Source5eb34e0 and new binaries bound; Q7 protocol/corpus/subject/eight qualification code hashes frozen in90094e9 before all84answers. Complete Q6 corpus/rubric reused unchanged; earlier adverse results retained."
+        },
+        {
+          "name": "independent-scoring",
+          "passed": true,
+          "detail": "All84actual paragraphs read in two independent masked42-row batches, then parent. Exact whole input/per-row hashes bound. Five unknown/hostile-target completeness review errors corrected under the frozen rubric with originals/addenda retained; no model rerun. Non-human review."
+        },
+        {
+          "name": "negative-controls",
+          "passed": true,
+          "detail": "All47with-recall outputs complete/grounded/control/format-correct; all37without safe,14complete and23appropriately incomplete. Unknown approval, hostile exposure, current priority, close-context names, deletion/foreign controls pass.37source packets unchanged;24namespaces cleaned."
+        }
+      ],
+      "evidence": [
+        {
+          "path": "subject.json",
+          "sha256": "ffc6ae4b11d55cc19a8ac075a4800bc9de779343ca72a6d903f81c7818e6888f"
+        },
+        {
+          "path": "assessment.json",
+          "sha256": "0285f487f49285c20270b0b54e4f1312f0525274aed7ad5c0eee6ced2af5039b"
+        },
+        {
+          "path": "protocol.json",
+          "sha256": "1f42dfc566ce2d2cf525ddb0021fb3fc9da8ee845fb78306b2ad74efddbd6a76"
+        },
+        {
+          "path": "corpus.json",
+          "sha256": "a8772a6a9f65d14f271ed2a359832f769fce6234c052fc849284a07729f3e411"
+        },
+        {
+          "path": "transfer-corpus.json",
+          "sha256": "6987ed6bb624648d73dad0272de3d602c47b20af5b868017a76aaa4b06a7e893"
+        },
+        {
+          "path": "source-lock.json",
+          "sha256": "475ad859fb87a79ce7111dfbe2e4bfc736a3f4bbaa591794c3d8a3cfb931d02d"
+        },
+        {
+          "path": "pinned-binaries.json",
+          "sha256": "5b5f174de90c3274d85005b420e2545f13ed3526ab0f47c570379006069b1f47"
+        },
+        {
+          "path": "replay-checks.json",
+          "sha256": "cd36499254f2e522b210e93610d6a864d5d58a1e0459577d9b5e9ee76912799d"
+        },
+        {
+          "path": "execution-checks.json",
+          "sha256": "3d09c8a5d3d0801128f31a03bd9ea88525441e4c2753fbc1b7098281bd97e935"
+        },
+        {
+          "path": "semantic-review.json",
+          "sha256": "25959ae05380c5d332c6c7c23e386b34fd0896730f7f2c927f0c69857b69bb17"
+        },
+        {
+          "path": "parent-review.json",
+          "sha256": "ad4bf32a412614b9a6cb86fc57ec25954016b5ddd4ac9ba43644b4f8a569a3a8"
+        },
+        {
+          "path": "source-review.json",
+          "sha256": "74b1c7278f5831e79156b2a2fa8cd8dfea94d6bd80acdb5ba21e6a58fef2ebae"
+        },
+        {
+          "path": "review-final-native.json",
+          "sha256": "17ddb6f53a5b9f8b7661771a7eef20fd2e4104bd885241e6f81322508c72f088"
+        },
+        {
+          "path": "review-inputs.json",
+          "sha256": "c8ad4d404534ec61f56e4b2d89edaa1e0df0a33a6782816c4a496d457c3aaaf2"
+        },
+        {
+          "path": "proof-manifest.json",
+          "sha256": "e4c39b0f92e386806fa141075830212508239bee9cab48aaa3f466581cdfcae0"
+        },
+        {
+          "path": "native-validation/harness-final.json",
+          "sha256": "fb19fa6003b431e6bcb31b984643da3e6968a268976a72e3417afe807b22f930"
+        }
+      ],
+      "pairedCases": [
+        {
+          "id": "h01",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 10617.723,
+          "latencyWithoutMs": 14972.781,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h02",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 11861.061,
+          "latencyWithoutMs": 16579.091,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h03",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 13874.251,
+          "latencyWithoutMs": 16433.594,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h04",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.3333333333333333,
+          "latencyWithMs": 11934.246,
+          "latencyWithoutMs": 13335.762,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h05",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.3333333333333333,
+          "latencyWithMs": 12699.393,
+          "latencyWithoutMs": 17971.94,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h06",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 14254.217,
+          "latencyWithoutMs": 12001.036,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h07",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 13553.926,
+          "latencyWithoutMs": 14802.828,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h08",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 16883.417,
+          "latencyWithoutMs": 12627.558,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h09",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 13375.463,
+          "latencyWithoutMs": 12524.481,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h10",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 11060.933,
+          "latencyWithoutMs": 9665.735,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h11",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 11748.152,
+          "latencyWithoutMs": 12329.207,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "h12",
+          "scoreWith": 0.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 13041.498,
+          "latencyWithoutMs": 14736.143,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q01",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 11516.346,
+          "latencyWithoutMs": 16704.625,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q02",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 12982.964,
+          "latencyWithoutMs": 18999.574,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q03",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.5,
+          "latencyWithMs": 10840.586,
+          "latencyWithoutMs": 16408.344,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q04",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 12380.149,
+          "latencyWithoutMs": 16130.914,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q05",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 12013.681,
+          "latencyWithoutMs": 13288.198,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q06",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 13436.848,
+          "latencyWithoutMs": 12549.0,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q07",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 11766.481,
+          "latencyWithoutMs": 13399.546,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q08",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 14098.859,
+          "latencyWithoutMs": 19126.552,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q09",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 18284.94,
+          "latencyWithoutMs": 15821.268,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q10",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.3333333333333333,
+          "latencyWithMs": 9736.727,
+          "latencyWithoutMs": 37813.966,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q11",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.3333333333333333,
+          "latencyWithMs": 11464.367,
+          "latencyWithoutMs": 15451.157,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q12",
+          "scoreWith": 0.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 15800.259,
+          "latencyWithoutMs": 13716.037,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q13",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 12117.81,
+          "latencyWithoutMs": 13831.364,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q14",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 9295.199,
+          "latencyWithoutMs": 14196.521,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q15",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 16383.24,
+          "latencyWithoutMs": 12094.295,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q16",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 11969.566,
+          "latencyWithoutMs": 18513.45,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q17",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 11960.265,
+          "latencyWithoutMs": 13070.748,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q18",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 15504.373,
+          "latencyWithoutMs": 13867.272,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q19",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 16932.251,
+          "latencyWithoutMs": 14181.458,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q20",
+          "scoreWith": 1.0,
+          "scoreWithout": 0.0,
+          "latencyWithMs": 13997.797,
+          "latencyWithoutMs": 16856.577,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q21",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 11838.976,
+          "latencyWithoutMs": 14863.99,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q22",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 13105.002,
+          "latencyWithoutMs": 12428.2,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q23",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 13561.977,
+          "latencyWithoutMs": 12165.053,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q24",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 12529.801,
+          "latencyWithoutMs": 13304.204,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        },
+        {
+          "id": "q25",
+          "scoreWith": 1.0,
+          "scoreWithout": 1.0,
+          "latencyWithMs": 18179.717,
+          "latencyWithoutMs": 15448.97,
+          "costWith": 0.0,
+          "costWithout": 0.0
+        }
+      ],
+      "costUnit": "paid-api-calls",
+      "error": null
+    }
+  }
+}

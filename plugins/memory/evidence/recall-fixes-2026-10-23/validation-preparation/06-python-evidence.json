@@ -1,0 +1,7 @@
+{
+  "argv": "python -m unittest discover -s plugins/memory/evidence/recall-fixes-2026-10-23 -p test_*.py",
+  "exit": 0,
+  "duration_seconds": 2.887,
+  "tests_run": "14",
+  "log": "plugins/memory/evidence/recall-fixes-2026-10-23/runtime/full-validation/06-python-evidence.log"
+}

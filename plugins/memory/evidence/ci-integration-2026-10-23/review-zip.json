@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "memory-zip-independent-review/v1",
+  "verdict": "pass",
+  "findings": [],
+  "scope": "Minimal patched dependency delta and ZIP9 API/mode compatibility only",
+  "reviewer": "independent Codex-native reviewer, parent acceptance",
+  "files": [
+    {
+      "path": "Cargo.toml",
+      "sha256": "2e7499a874cbd4c2b948ff395632a1511af7d1486747f0665752e7c0c6d45340"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "b9feef8ff8428bf28ed07351c8ac3a0b0635208a11741dafbe8339a24fc9f052"
+    },
+    {
+      "path": "shared/tooling/Cargo.toml",
+      "sha256": "762d8cc741e8ef7d81f1f5b9ac7f8085a1bf09ee1a7aeabaa8de5bc46baf4e32"
+    },
+    {
+      "path": "shared/plugin-sdk/Cargo.toml",
+      "sha256": "55a1b99e9fcc41811b6c51d76305209804ff7a53e8d9125741bc30a3b22101e5"
+    },
+    {
+      "path": "shared/tooling/src/installer.rs",
+      "sha256": "a9509996d5d290f7cc6c461a2906b5a9a08f6a1a93f7a346f030187f7ffa0976"
+    },
+    {
+      "path": "shared/tooling/src/capability_installer.rs",
+      "sha256": "296ddf38ac3f64a4dc4eac478e75c374a2696909b3816b30df529e95f37c6b6d"
+    },
+    {
+      "path": "shared/plugin-sdk/src/lib.rs",
+      "sha256": "6c07232a1ed510b3eade10d50daccc75c77bbb7a5286a80b4c75b663a11dc849"
+    }
+  ],
+  "checks": [
+    "No vulnerability ignores; requested patched stable versions locked",
+    "No path validation weakened",
+    "name errors propagate via existing ZIP error variants",
+    "Both writer formats forceUnix creator and retain0755/0644 modes",
+    "Existingv1 executablemode regression retained; v3strengthened",
+    "Newmalformed centraldirectory case accurately asserts parserfailure beforeinstallation"
+  ],
+  "validationLimit": "Worker-observed native summaries retained separately; raw four-crate output will be captured on the committed source and final fullworkspace CI must pass."
+}

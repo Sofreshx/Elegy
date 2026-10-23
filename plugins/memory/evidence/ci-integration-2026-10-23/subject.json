@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "memory-codex-qualified-subject/v2",
+  "sourceRevision": "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1",
+  "evidencePreparationRevision": "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1",
+  "sourceLockSha256": "475ad859fb87a79ce7111dfbe2e4bfc736a3f4bbaa591794c3d8a3cfb931d02d",
+  "cliSourceSha256": "1742beff51d26ca32749e7b70ef7cce365f6ed4d3636f5c5e7116a4ecd0783ba",
+  "cliSha256": "55b76918b44dc1e556a027f444d0c47c8e1175bae6d3d7a59df1fc274917afd6",
+  "mcpSha256": "ad5e338e9733a0dd1516e9fec28b99f625fe63246c0b52cf929ddc9b1cf83c7b",
+  "buildMatchesSource": true,
+  "memoryVersion": "0.1.0",
+  "corpusSha256": "a8772a6a9f65d14f271ed2a359832f769fce6234c052fc849284a07729f3e411",
+  "protocolSha256": "1f42dfc566ce2d2cf525ddb0021fb3fc9da8ee845fb78306b2ad74efddbd6a76",
+  "buildProvenance": "Actual locked offline dual-binary build on committed5eb34e0; source149/18 unchanged, native build log captured. CLI eval status on isolated ledger reports buildMatchesSource=true/rebuildRequired=false. New immutable binary copies, original/copy hashes checked. Full workspace/MSRV CI remains separate final integration gate.",
+  "limits": "Model aliases/backend unsealed; one installed software host; lexical mode; complete context cap600; synthetic explicit ingestion and fresh processes, not unattended daily usage.",
+  "model": "gpt-6.1-sol",
+  "reasoningEffort": "max",
+  "priorSubjectSha256": "01d2d162639b7aace41503649d18e3517c5ef1ddf81fc2266f42214ed7fd1d8c",
+  "binaryPaths": {
+    "cli": "runtime/qualified-binaries/elegy-memory.exe",
+    "mcp": "runtime/qualified-binaries/elegy-memory-mcp-stdio.exe"
+  },
+  "sourceProof": "source-lock.json",
+  "harnessProof": "../answer-grounding-2026-10-23/evidence-manifest.json",
+  "harnessManifestSha256": "0a3b1f2e07dd430b2281355e43575fe3efff7f3c03c1da78ad97600377ddaddb",
+  "harnessSourceFiles": {
+    "qualification_runner.py": "0af3c61bd27151e9b2e2d8c2a92b8925411f35cdc0e548a747576dc9dd045c30",
+    "answer_runner.py": "9bd417a00518bccc0d61e75908996e0bdc80b62db9a6b96e8e278f831994ae0b",
+    "run_replay.py": "1581b08a921e4dca1bec1207ceed384d883f6061319c3edc519d25a97eed4d1f",
+    "rpc_support.py": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759",
+    "grade.py": "bf330b80fa97bc734f73e4a8c3c9257201ba12fb0ecbc52277b2e46bbb78cf54"
+  },
+  "codexSha256": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+  "codexVersion": "codex-cli 0.163.0-alpha.11",
+  "qualificationSourceFiles": {
+    "campaign.py": "1c29a47ba3c6bde5e096b82ba52edcc3e4c66c3248fea4ef38df248406c38435",
+    "assess.py": "324a057b79238a49da53fc09f8b389622bfeea3ebc1101f58de79814d8987cdb",
+    "prepare_review.py": "17fae1edc513d4066ebbe6ed84cd3bfa9326f4a5ac89cbd61d8dc244aba2a762",
+    "verify_source.py": "21fa6bc3fad6671ca0a6c939b9c75757eb5764503942efa78cdbc6eaf23893b1",
+    "test_campaign.py": "eba30ba58bc7ebf7cb64620de8c065cdbc57f0b080709d6d463bfc4a59a55b72",
+    "test_assess.py": "5e8ac462e898b7220272511e32182c96d06d7b4e850fae91dce5851096cb00df",
+    "test_verify_source.py": "af449c61bd78655803ea215bc90a68658e1b413fbc9bfa41f4afe334e3880704",
+    "test_evidence_binding.py": "17f2d92bd379c8cfdcf81bd1ae6d75126bdce3e89af540c6302884c2a6c47256"
+  }
+}

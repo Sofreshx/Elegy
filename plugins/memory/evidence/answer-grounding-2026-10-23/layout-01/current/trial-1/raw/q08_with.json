@@ -1,0 +1,43 @@
+{
+  "answer": "Le runbook Ares utilise `BACKUP_COPAL`, avec une rétention corrigée de 11 jours.",
+  "threadId": "01a16771-87f4-7430-9f72-1d5dc3364e49",
+  "usage": {
+    "input_tokens": 20869,
+    "cached_input_tokens": 16512,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 135,
+    "reasoning_output_tokens": 105
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a16771-87f4-7430-9f72-1d5dc3364e49\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Le runbook Ares utilise `BACKUP_COPAL`, avec une rétention corrigée de 11 jours.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20869,\"cached_input_tokens\":16512,\"cache_write_input_tokens\":0,\"output_tokens\":135,\"reasoning_output_tokens\":105}}\n",
+  "stderr": "2026-10-23T06:27:36.074183Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n2026-10-23T06:27:37.126296Z  WARN sqlx::query: slow statement: execution time exceeded alert threshold summary=\"DELETE FROM logs WHERE …\" db.statement=\"\\n\\nDELETE FROM logs WHERE ts < ?\\n\" rows_affected=0 rows_returned=0 elapsed=1.7207695s elapsed_secs=1.7207694999999998 slow_threshold=1s\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q08",
+  "arm": "with",
+  "startedAt": "2026-10-23T06:27:34.856437+00:00",
+  "completedAt": "2026-10-23T06:27:43.507349+00:00",
+  "elapsedMs": 8651.372,
+  "promptSha256": "81fa831bfb620a95453adcb674d9ad21206796888eeef56793af9a889dcf0437",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

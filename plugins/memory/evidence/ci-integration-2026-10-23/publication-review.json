@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "memory-publication-proof-review/v1",
+  "status": "approved",
+  "reviewer": "Independent ci_integration_review, read-only; parent accepts. Not human.",
+  "sourceRevision": "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1",
+  "files": [
+    {
+      "path": "publication_derivatives.py",
+      "sha256": "1c4c537067c8a9e39307df118852d1114ed99d48366599cd85bd08a0e974263c"
+    },
+    {
+      "path": "publication-derivatives.json",
+      "sha256": "19a711dc423ecc00bc3a856e4c7d762c3db2e2a7822da16e1bb8e6111b9e2bb4"
+    },
+    {
+      "path": "public-proof-manifest.json",
+      "sha256": "e68e3adf8d6f75bcd8374221ff5ab3f731a06e8cdd02b912d47139477db6d957"
+    },
+    {
+      "path": "public-answer-quality-observation.json",
+      "sha256": "9676d7b205c0ff03cf842d4f5cde8015486ea12af3a77bada6b03028f85ceca0"
+    },
+    {
+      "path": "public-record-output.json",
+      "sha256": "e96b96e6c873063803aa230cd14aec84ad1ca605aef42da539215b99cb61c95d"
+    },
+    {
+      "path": "public-qualification-status.json",
+      "sha256": "e936e220bd9d49b40b63890d806a664f0ef1685d719ea2bfd0ebc192cb81503c"
+    },
+    {
+      "path": "public-qualification-history.json",
+      "sha256": "f4a6b351ce28857f7c49e9b622cfd182130adc3b9d0218b9c8869af90254efe0"
+    },
+    {
+      "path": "public-receipt-summary.json",
+      "sha256": "9ff6ac681cb0bce4caa83eff28a776e65b64ff45a6c5653d0495a0ed27168bc6"
+    },
+    {
+      "path": "recorder-original/ledger.json",
+      "sha256": "8bef9a47850a264162cdf1639a03ec158ba29269b0532f4cc533a4ccd3c5a955"
+    },
+    {
+      "path": "recorder-original/receipts/488792f5-fcb6-426b-b151-8b23716ae0f6.json",
+      "sha256": "16041cad4cac43bebcf52af3f2a75e9aba4876e8ed06cf8639bf5eb82635d8f5"
+    },
+    {
+      "path": "recorder-public/ledger.json",
+      "sha256": "3387f7804aa75005bad94bd7586c46d1f6e6a8baf3f153985fb8e343607bc984"
+    },
+    {
+      "path": "recorder-public/receipts/3b103385-f0a9-4961-a12a-103a8318a2ff.json",
+      "sha256": "67ff1716c61705effa47a87c8c01992f48d035229847f49cb28d4c78babab6d3"
+    },
+    {
+      "path": "native-validation/final-document-bindings.json",
+      "sha256": "2910a5f47389ecef34e06c6a192346cd5ca7a559efcce4333432be5546b1b0ca"
+    },
+    {
+      "path": "native-validation/repo-shape-public-final.json",
+      "sha256": "c2d2f04d9683f76c962198d09358a13b0ee7c066ff1665f56cc942ee410057c0"
+    }
+  ],
+  "findings": [],
+  "checks": [
+    "Only argv[0] JSON token normalized; every other metadata byte and all result fields unchanged.",
+    "Exactly one diagnostic prefix normalized; failing gate exit1 retained.",
+    "All198 unique public bundle paths/hashs verified; scope excludes runtime/recorder-public and declares Q7 root.",
+    "All16 regular input copies satisfy hashes,size and no-reparse constraints; public receipt and ledger coherent, reported-satisfied without stale.",
+    "Original and public observations preserve84sessions,37pairs, controls, measures, source, protocol, subject and scores; no model call added.",
+    "Private original snapshot and canonical backup each226 byte-identical files; archived original ledger/receipt byte-identical.",
+    "Eight frozen qualification sources and Rust product sources unchanged.",
+    "README/store scope and original/public generations explicit; no remote CI success presumed."
+  ],
+  "parentAdditionalChecks": {
+    "repoShapeIssues": 0,
+    "relativeLinkPathsVerified": 303,
+    "verbatimAnswersVerified": 84,
+    "stagedEvidenceByteExactBeforeFinalReports": 260
+  },
+  "limits": "Private path-bearing originals have local backups only; public derivative and source are intended for authorized Git delivery. Exact final-head remote CI and merge remain separate."
+}

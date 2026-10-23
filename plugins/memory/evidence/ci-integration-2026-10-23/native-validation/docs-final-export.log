@@ -1,0 +1,8 @@
+
+--- stderr ---
+error: the following required arguments were not provided:
+  --output <OUTPUT>
+
+Usage: elegy-documentation.exe export bundle --project <PROJECT> --output <OUTPUT> --json
+
+For more information, try '--help'.

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "elegy-repo-shape-report/v1",
+  "project": "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes",
+  "generatedAt": "2026-10-23T14:07:26.7480411Z",
+  "mode": "blocking",
+  "issueCount": 1,
+  "issues": [
+    {
+      "code": "content.local_path",
+      "path": "plugins/memory/evidence/ci-integration-2026-10-23/native-validation/harness-final.json",
+      "severity": "warning",
+      "message": "Tracked file contains a local absolute path token: <local-path-prefix>"
+    }
+  ]
+}
+
+--- stderr ---

@@ -1,0 +1,15 @@
+=== COMMAND ===
+["<python>", "-m", "unittest", "discover", "-s", "plugins/memory/evidence/ci-integration-2026-10-23", "-p", "test_sanitize_evidence.py", "-v"]
+=== STDOUT ===
+
+=== STDERR ===
+test_neutralized_appdata_fragment_is_normalized (test_sanitize_evidence.SanitizerTests.test_neutralized_appdata_fragment_is_normalized) ... ok
+test_plain_text_is_unchanged (test_sanitize_evidence.SanitizerTests.test_plain_text_is_unchanged) ... ok
+test_real_bindings_reconstruct_all_three_files (test_sanitize_evidence.SanitizerTests.test_real_bindings_reconstruct_all_three_files) ... ok
+test_single_and_doubled_windows_paths_are_neutralized (test_sanitize_evidence.SanitizerTests.test_single_and_doubled_windows_paths_are_neutralized) ... ok
+test_tampered_binding_is_rejected (test_sanitize_evidence.SanitizerTests.test_tampered_binding_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 1.623s
+
+OK

@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "<python>",
+    "-m",
+    "unittest",
+    "test_evidence_binding",
+    "-v"
+  ],
+  "exitCode": 1,
+  "durationSeconds": 0.55,
+  "log": "evidence-binding-red.log",
+  "logSha256": "8127af8b815143969a9e8652362ccd12b8e277960e67c35cd4bb81842d383e1b",
+  "kind": "harness regression before implementing strict question/context and configuration bindings"
+}

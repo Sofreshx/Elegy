@@ -1,0 +1,43 @@
+{
+  "answer": "READY",
+  "threadId": "01a16707-5c3a-79e3-a5fc-2501e61b881e",
+  "usage": {
+    "input_tokens": 20515,
+    "cached_input_tokens": 10496,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 5,
+    "reasoning_output_tokens": 0
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a16707-5c3a-79e3-a5fc-2501e61b881e\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"READY\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20515,\"cached_input_tokens\":10496,\"cache_write_input_tokens\":0,\"output_tokens\":5,\"reasoning_output_tokens\":0}}\n",
+  "stderr": "2026-10-23T04:31:38.061022Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n2026-10-23T04:31:41.082933Z  WARN sqlx::query: slow statement: execution time exceeded alert threshold summary=\"DELETE FROM logs WHERE …\" db.statement=\"\\n\\nDELETE FROM logs WHERE ts < ?\\n\" rows_affected=16466 rows_returned=0 elapsed=3.2560441s elapsed_secs=3.2560441 slow_threshold=1s\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "preflight",
+  "arm": "without",
+  "startedAt": "2026-10-23T04:31:37.178968+00:00",
+  "completedAt": "2026-10-23T04:31:43.475925+00:00",
+  "elapsedMs": 6296.656,
+  "promptSha256": "b160b94f67beff1361130a5a7e184d28ee346442fdac2c1a98636c277ee43572",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

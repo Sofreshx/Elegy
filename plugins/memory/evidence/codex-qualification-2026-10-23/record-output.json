@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "elegy.cli/v1",
+  "correlationId": "elegy-memory-8500-1792746874000437600",
+  "command": [
+    "eval.record"
+  ],
+  "status": "invalid",
+  "failure": {
+    "code": "CLI-INVALID-INPUT",
+    "message": "Access is denied. (os error 5)",
+    "category": "invalidInput",
+    "retryable": false,
+    "correlationId": "elegy-memory-8500-1792746874000437600",
+    "details": null,
+    "cause": null
+  }
+}

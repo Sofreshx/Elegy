@@ -1,0 +1,643 @@
+EEEEEEEEEEEEEEEEEEEEEEEEEEEE
+======================================================================
+ERROR: test_context_byte_budget_is_enforced (test_recall_hook.RecallHookTests.test_context_byte_budget_is_enforced)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 134, in test_context_byte_budget_is_enforced
+    self.write_config(maxContextTokens=4)
+  File "<local-path>", line 27, in write_config
+    self.config.write_text(json.dumps(config), encoding="utf-8")
+  File "<local-path>", line 1047, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '<local-path>'
+
+======================================================================
+ERROR: test_context_byte_budget_is_enforced (test_recall_hook.RecallHookTests.test_context_byte_budget_is_enforced)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 637, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<local-path>", line 22, in tearDown
+    self.tmp.cleanup()
+  File "<local-path>", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "<local-path>", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "<local-path>", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 639, in _rmtree_unsafe
+    onexc(os.rmdir, path, err)
+  File "<local-path>", line 906, in onexc
+    _resetperms(path)
+  File "<local-path>", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "<local-path>", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+======================================================================
+ERROR: test_continuous_child_output_is_bounded (test_recall_hook.RecallHookTests.test_continuous_child_output_is_bounded)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 180, in test_continuous_child_output_is_bounded
+    self.write_config()
+  File "<local-path>", line 27, in write_config
+    self.config.write_text(json.dumps(config), encoding="utf-8")
+  File "<local-path>", line 1047, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '<local-path>'
+
+======================================================================
+ERROR: test_continuous_child_output_is_bounded (test_recall_hook.RecallHookTests.test_continuous_child_output_is_bounded)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 637, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<local-path>", line 22, in tearDown
+    self.tmp.cleanup()
+  File "<local-path>", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "<local-path>", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "<local-path>", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 639, in _rmtree_unsafe
+    onexc(os.rmdir, path, err)
+  File "<local-path>", line 906, in onexc
+    _resetperms(path)
+  File "<local-path>", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "<local-path>", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+======================================================================
+ERROR: test_cwd_outside_project_is_rejected (test_recall_hook.RecallHookTests.test_cwd_outside_project_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 101, in test_cwd_outside_project_is_rejected
+    self.write_config()
+  File "<local-path>", line 27, in write_config
+    self.config.write_text(json.dumps(config), encoding="utf-8")
+  File "<local-path>", line 1047, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '<local-path>'
+
+======================================================================
+ERROR: test_cwd_outside_project_is_rejected (test_recall_hook.RecallHookTests.test_cwd_outside_project_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 637, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<local-path>", line 22, in tearDown
+    self.tmp.cleanup()
+  File "<local-path>", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "<local-path>", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "<local-path>", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 639, in _rmtree_unsafe
+    onexc(os.rmdir, path, err)
+  File "<local-path>", line 906, in onexc
+    _resetperms(path)
+  File "<local-path>", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "<local-path>", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+======================================================================
+ERROR: test_injection_uses_envelope (test_recall_hook.RecallHookTests.test_injection_uses_envelope)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 60, in test_injection_uses_envelope
+    self.write_config()
+  File "<local-path>", line 27, in write_config
+    self.config.write_text(json.dumps(config), encoding="utf-8")
+  File "<local-path>", line 1047, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '<local-path>'
+
+======================================================================
+ERROR: test_injection_uses_envelope (test_recall_hook.RecallHookTests.test_injection_uses_envelope)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 637, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<local-path>", line 22, in tearDown
+    self.tmp.cleanup()
+  File "<local-path>", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "<local-path>", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "<local-path>", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 639, in _rmtree_unsafe
+    onexc(os.rmdir, path, err)
+  File "<local-path>", line 906, in onexc
+    _resetperms(path)
+  File "<local-path>", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "<local-path>", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+======================================================================
+ERROR: test_malformed_input_and_wrong_event_fail_open (test_recall_hook.RecallHookTests.test_malformed_input_and_wrong_event_fail_open)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 91, in test_malformed_input_and_wrong_event_fail_open
+    self.write_config()
+  File "<local-path>", line 27, in write_config
+    self.config.write_text(json.dumps(config), encoding="utf-8")
+  File "<local-path>", line 1047, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '<local-path>'
+
+======================================================================
+ERROR: test_malformed_input_and_wrong_event_fail_open (test_recall_hook.RecallHookTests.test_malformed_input_and_wrong_event_fail_open)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 637, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<local-path>", line 22, in tearDown
+    self.tmp.cleanup()
+  File "<local-path>", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "<local-path>", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "<local-path>", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 639, in _rmtree_unsafe
+    onexc(os.rmdir, path, err)
+  File "<local-path>", line 906, in onexc
+    _resetperms(path)
+  File "<local-path>", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "<local-path>", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+======================================================================
+ERROR: test_mode_off_does_not_launch_child (test_recall_hook.RecallHookTests.test_mode_off_does_not_launch_child)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 52, in test_mode_off_does_not_launch_child
+    self.write_config(mode="off")
+  File "<local-path>", line 27, in write_config
+    self.config.write_text(json.dumps(config), encoding="utf-8")
+  File "<local-path>", line 1047, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '<local-path>'
+
+======================================================================
+ERROR: test_mode_off_does_not_launch_child (test_recall_hook.RecallHookTests.test_mode_off_does_not_launch_child)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 637, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<local-path>", line 22, in tearDown
+    self.tmp.cleanup()
+  File "<local-path>", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "<local-path>", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "<local-path>", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 639, in _rmtree_unsafe
+    onexc(os.rmdir, path, err)
+  File "<local-path>", line 906, in onexc
+    _resetperms(path)
+  File "<local-path>", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "<local-path>", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+======================================================================
+ERROR: test_null_transcript_still_recalls_current_prompt (test_recall_hook.RecallHookTests.test_null_transcript_still_recalls_current_prompt)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 85, in test_null_transcript_still_recalls_current_prompt
+    self.write_config()
+  File "<local-path>", line 27, in write_config
+    self.config.write_text(json.dumps(config), encoding="utf-8")
+  File "<local-path>", line 1047, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '<local-path>'
+
+======================================================================
+ERROR: test_null_transcript_still_recalls_current_prompt (test_recall_hook.RecallHookTests.test_null_transcript_still_recalls_current_prompt)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 637, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<local-path>", line 22, in tearDown
+    self.tmp.cleanup()
+  File "<local-path>", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "<local-path>", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "<local-path>", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 639, in _rmtree_unsafe
+    onexc(os.rmdir, path, err)
+  File "<local-path>", line 906, in onexc
+    _resetperms(path)
+  File "<local-path>", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "<local-path>", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+======================================================================
+ERROR: test_observe_and_bad_envelopes_are_discarded (test_recall_hook.RecallHookTests.test_observe_and_bad_envelopes_are_discarded)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 75, in test_observe_and_bad_envelopes_are_discarded
+    self.write_config()
+  File "<local-path>", line 27, in write_config
+    self.config.write_text(json.dumps(config), encoding="utf-8")
+  File "<local-path>", line 1047, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '<local-path>'
+
+======================================================================
+ERROR: test_observe_and_bad_envelopes_are_discarded (test_recall_hook.RecallHookTests.test_observe_and_bad_envelopes_are_discarded)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 637, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<local-path>", line 22, in tearDown
+    self.tmp.cleanup()
+  File "<local-path>", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "<local-path>", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "<local-path>", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 639, in _rmtree_unsafe
+    onexc(os.rmdir, path, err)
+  File "<local-path>", line 906, in onexc
+    _resetperms(path)
+  File "<local-path>", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "<local-path>", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+======================================================================
+ERROR: test_recent_context_reads_known_transcript_items (test_recall_hook.RecallHookTests.test_recent_context_reads_known_transcript_items)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 139, in test_recent_context_reads_known_transcript_items
+    self.write_config(includeRecentContext=True)
+  File "<local-path>", line 27, in write_config
+    self.config.write_text(json.dumps(config), encoding="utf-8")
+  File "<local-path>", line 1047, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '<local-path>'
+
+======================================================================
+ERROR: test_recent_context_reads_known_transcript_items (test_recall_hook.RecallHookTests.test_recent_context_reads_known_transcript_items)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 637, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<local-path>", line 22, in tearDown
+    self.tmp.cleanup()
+  File "<local-path>", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "<local-path>", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "<local-path>", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 639, in _rmtree_unsafe
+    onexc(os.rmdir, path, err)
+  File "<local-path>", line 906, in onexc
+    _resetperms(path)
+  File "<local-path>", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "<local-path>", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+======================================================================
+ERROR: test_recent_context_selects_latest_four_and_trusted_transcript_root (test_recall_hook.RecallHookTests.test_recent_context_selects_latest_four_and_trusted_transcript_root)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 153, in test_recent_context_selects_latest_four_and_trusted_transcript_root
+    transcript_root.mkdir()
+  File "<local-path>", line 1311, in mkdir
+    os.mkdir(self, mode)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+======================================================================
+ERROR: test_recent_context_selects_latest_four_and_trusted_transcript_root (test_recall_hook.RecallHookTests.test_recent_context_selects_latest_four_and_trusted_transcript_root)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 637, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<local-path>", line 22, in tearDown
+    self.tmp.cleanup()
+  File "<local-path>", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "<local-path>", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "<local-path>", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 639, in _rmtree_unsafe
+    onexc(os.rmdir, path, err)
+  File "<local-path>", line 906, in onexc
+    _resetperms(path)
+  File "<local-path>", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "<local-path>", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+======================================================================
+ERROR: test_shell_like_prompt_is_data (test_recall_hook.RecallHookTests.test_shell_like_prompt_is_data)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 125, in test_shell_like_prompt_is_data
+    self.write_config()
+  File "<local-path>", line 27, in write_config
+    self.config.write_text(json.dumps(config), encoding="utf-8")
+  File "<local-path>", line 1047, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '<local-path>'
+
+======================================================================
+ERROR: test_shell_like_prompt_is_data (test_recall_hook.RecallHookTests.test_shell_like_prompt_is_data)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 637, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<local-path>", line 22, in tearDown
+    self.tmp.cleanup()
+  File "<local-path>", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "<local-path>", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "<local-path>", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 639, in _rmtree_unsafe
+    onexc(os.rmdir, path, err)
+  File "<local-path>", line 906, in onexc
+    _resetperms(path)
+  File "<local-path>", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "<local-path>", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+======================================================================
+ERROR: test_timeout_and_oversized_input_fail_open (test_recall_hook.RecallHookTests.test_timeout_and_oversized_input_fail_open)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 172, in test_timeout_and_oversized_input_fail_open
+    self.write_config()
+  File "<local-path>", line 27, in write_config
+    self.config.write_text(json.dumps(config), encoding="utf-8")
+  File "<local-path>", line 1047, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '<local-path>'
+
+======================================================================
+ERROR: test_timeout_and_oversized_input_fail_open (test_recall_hook.RecallHookTests.test_timeout_and_oversized_input_fail_open)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 637, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<local-path>", line 22, in tearDown
+    self.tmp.cleanup()
+  File "<local-path>", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "<local-path>", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "<local-path>", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 639, in _rmtree_unsafe
+    onexc(os.rmdir, path, err)
+  File "<local-path>", line 906, in onexc
+    _resetperms(path)
+  File "<local-path>", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "<local-path>", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+======================================================================
+ERROR: test_unsupported_response_item_schema_yields_no_recent_context (test_recall_hook.RecallHookTests.test_unsupported_response_item_schema_yields_no_recent_context)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 164, in test_unsupported_response_item_schema_yields_no_recent_context
+    self.write_config(includeRecentContext=True)
+  File "<local-path>", line 27, in write_config
+    self.config.write_text(json.dumps(config), encoding="utf-8")
+  File "<local-path>", line 1047, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '<local-path>'
+
+======================================================================
+ERROR: test_unsupported_response_item_schema_yields_no_recent_context (test_recall_hook.RecallHookTests.test_unsupported_response_item_schema_yields_no_recent_context)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 637, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<local-path>", line 22, in tearDown
+    self.tmp.cleanup()
+  File "<local-path>", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "<local-path>", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "<local-path>", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 639, in _rmtree_unsafe
+    onexc(os.rmdir, path, err)
+  File "<local-path>", line 906, in onexc
+    _resetperms(path)
+  File "<local-path>", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "<local-path>", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+======================================================================
+ERROR: test_valid_request_with_failing_child_fails_open (test_recall_hook.RecallHookTests.test_valid_request_with_failing_child_fails_open)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 107, in test_valid_request_with_failing_child_fails_open
+    self.write_config()
+  File "<local-path>", line 27, in write_config
+    self.config.write_text(json.dumps(config), encoding="utf-8")
+  File "<local-path>", line 1047, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '<local-path>'
+
+======================================================================
+ERROR: test_valid_request_with_failing_child_fails_open (test_recall_hook.RecallHookTests.test_valid_request_with_failing_child_fails_open)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<local-path>", line 637, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<local-path>", line 22, in tearDown
+    self.tmp.cleanup()
+  File "<local-path>", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "<local-path>", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "<local-path>", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<local-path>", line 639, in _rmtree_unsafe
+    onexc(os.rmdir, path, err)
+  File "<local-path>", line 906, in onexc
+    _resetperms(path)
+  File "<local-path>", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "<local-path>", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] Access is denied: '<local-path>'
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.155s
+
+FAILED (errors=28)

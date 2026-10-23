@@ -1,0 +1,401 @@
+---
+title: Memory recall quality corrections
+status: active
+owner: Elegy Memory
+doc_kind: planning
+---
+
+# Memory recall quality corrections
+
+Goal: correct the retrieval failure found by the 23 October controlled session
+qualification and test whether clearer evidence-use guidance reduces the observed
+answer failures. The user authorized fixes, then push and merge only after clean
+validation. This does not authorize installations, paid APIs, changes to real
+memory, permanent host configuration, or claims of universal answer reliability.
+
+Authority: root AGENTS → architecture README → contextual recall v1 spec →
+Memory AGENTS → CONTRIBUTING validation matrix. Existing qualification branch
+`codex/memory-realistic-20261023` is preserved; this correction branch starts at
+`619f5dd705e6383a12b7d806369633df291fc1a3`.
+
+## Evidence and design
+
+- q17/q18 inject the short Harbor-Sandbox record although the applicable Harbor
+  record exists. OR FTS matching and relative BM25 normalization favor the shorter
+  near-name record. Scope, owner and sensitivity filters work; there is no
+  structured project boundary in this binding.
+- q08/q11 omit facts that are actually recalled. q09 substitutes a runbook name
+  for an unknown snapshot identifier. These are model answer failures, not missing
+  database rows.
+- Keep the SQL access filters, read-only source, separate journal, three-record
+  limit, complete-envelope byte budget, event/feedback contracts and JSON shape.
+- For contextual lexical retrieval only, preserve hyphenated surface tokens and
+  rank by distinct exact query-token matches in the text actually delivered,
+  normalized to the highest eligible lexical match count. Ordinary search and vector
+  scoring remain as before. This is a relevance heuristic, not project isolation.
+- Make the fixed envelope explicitly require facts for the same context and
+  requested attribute, abstention when missing, and priority for current
+  instructions. Keep the instruction/data boundary and full byte accounting.
+
+The lexical candidate set remains OR FTS with the existing SQL access filters.
+The new lexical signal also participates in hybrid recall; the vector channel
+and its blending remain unchanged. Normalize over keyword candidates after SQL
+scope/owner/state/sensitivity predicates and before similarity floor, journal
+suppression and byte budget. Zero exact matches yields zero lexical signal.
+Equal counts keep the existing secondary ranking/tie rules. A single candidate
+can still score 1: this remains relative relevance, never confidence or security.
+
+Surface tokens retain ASCII internal hyphens and underscores, trim boundary
+hyphens, lowercase with Rust Unicode casing and preserve accents. Other
+punctuation separates tokens. `Atlas-Lab` is one token, distinct from `Atlas`
+and from the spaced form `Atlas Lab`; no inferred alias or fuzzy project match.
+Count distinct query terms once, regardless of repetitions. Use the same shorter
+nonempty summary-or-content rule as delivery. Content and tags still generate
+FTS candidates, but matches absent from the delivered snippet get no lexical
+credit. Tests must cover summary and tag-only candidates, case, duplicates,
+empty lexical matches, hybrid access controls and full-envelope byte accounting.
+The current stopword list, minimum of three characters and cap of twelve unique
+query terms remain in force. Ordinary search and vector-only scores need an
+old/new control on the same synthetic rows; hybrid output may change through its
+lexical component, with ownership/scope filters still mandatory. Compare q08/q11
+recalled content and order mechanically before interpreting answer differences.
+
+## Work and acceptance
+
+- [x] Add integration regressions first: Harbor q17/q18, explicit Sandbox query,
+  independent Atlas/Atlas-Lab pair, unchanged source. Observe the intended red
+  result before changing production code.
+- [x] Review the plan, then implement the smallest correction and align the
+  existing recall spec. No database migration or new provider/dependency.
+- [x] Run focused regressions, complete Memory and MCP suites, hook tests,
+  formatting, Clippy, governed contracts and documentation checks. Preserve all
+  failures; attribute base/environment failures before changing unrelated code.
+- [x] Commit exact source before qualifying new executables; record source and
+  binary hashes. Use isolated fictitious stores and fresh model contexts only.
+- [x] Reuse the frozen 24-question corpus and rubric. Compare exact old/new recall
+  packets. For answer quality, retain all trials: three realizations of q08, q09,
+  q11, q17 and q18, one realization of other controls. No prompt tuning after
+  seeing these answers and no retry that replaces an adverse result.
+- [ ] Each of the five problematic cases must pass individually on every retained
+  trial. There is no three-of-five threshold. q08/q11 already have the correct
+  recalled text; any improvement there can only be attributed to the answer
+  guidance/model behavior, not repaired candidate generation.
+- [x] Report lexical score separately from semantic reading and each unsupported
+  answer/omission. No new contamination, secret leak or hostile instruction use;
+  explicitly distinguish passed finite controls from general reliability.
+- [ ] Inspect exact final diff, independent review, private-content/metadata gates,
+  publication effects, remote target and CI tied to the actual head. Push the
+  task branch and merge only if applicable gates are satisfied; verify remote SHA.
+
+Stop and reassess if data outside scratch is needed, paid capacity or installation
+is required, a source changes during qualification, or model failures persist.
+An unavailable second software host stays blocked. Green deterministic tests do
+not turn failed answer controls into a passing autonomous-use claim.
+
+Rollback: revert the isolated correction commits; keep previous proofs and failed
+trials. No published-history rewriting or force push.
+
+## Qualification checkpoint — 23 October
+
+**Blocked for push and merge.** Product source `b828223` fixes the Harbor
+selection regression, and q17/q18 each pass all three retained answer trials.
+The frozen acceptance criterion fails for q08, q09 and q11: one retention
+omission, three runbook/snapshot substitutions and two time omissions across
+the 15 target answers. Do not retune this corpus or discard adverse trials.
+The guidance change is not qualified as a remedy for those model failures.
+
+The full Memory suite passes (408 tests, including 31 contextual recall tests),
+as do all 67 MCP tests, 14 hook tests, 14 evidence tests, Clippy, formatting,
+contracts, documentation checks and the CLI/MCP build. The actual second
+software host preflight is blocked by HTTP 403 from its advertised free provider;
+no paid fallback or permanent configuration was introduced.
+
+See [the correction qualification report](../../plugins/memory/evidence/recall-fixes-2026-10-23/README.md)
+and its individual answers, source/binary bindings and reproducible adverse gate.
+Safe local checkpoints remain authorized; the user's conditional publication
+authorization has not been satisfied.
+
+## Resumed correction — evidence-use envelope
+
+The user now explicitly asks to resolve the three answer failures and then push
+and merge after all applicable checks pass. The second software host is excluded
+by that same user's direction; preserve its historical result without making it
+a gate for this resumed slice.
+
+The prior source and all failed answers remain immutable. Correct facts were
+transmitted in q08/q11; q09's requested snapshot identifier was absent. A fresh
+controlled comparison will vary only the fixed envelope prefix: require matching
+context and field, extracting all requested values and never substituting a
+different field's value. This is a testable hypothesis, not yet an accepted fix.
+The candidate is 197 bytes, within the prior envelope's budget, and contains no
+corpus labels or answers. No product source is changed before the comparison.
+
+1. Freeze the diagnostic protocol and run 30 fresh contexts: five cases, three
+   trials, current versus candidate prefix with identical JSON records.
+2. Require all fifteen candidate answers to pass and at least one current
+   control failure; retain every trial and inspect actual prose independently.
+3. If supported, apply the single envelope change, align the existing spec,
+   run focused and full checks, and commit exact source before new binaries.
+4. Qualify actual rebuilt outputs with the unchanged 24 paired questions, three
+   realizations of all five critical cases, and twelve frozen transfer questions
+   using new fictional labels and values. The transfer sample is synthetic,
+   structurally related coverage, not an independent real-world benchmark.
+5. Require each critical answer in all three trials, all transfer with-recall
+   answers and all safety/abstention/override controls to pass. No test weakening,
+   answer replacement, model substitution or economic claim.
+6. Verify source/binary/evidence bindings, independent review, publication gates
+   and exact-head CI before push/merge. Existing main-snapshot automation is
+   already disclosed and authorized by the requested merge.
+
+Diagnostic and final acceptance remain separate. If the candidate fails, use
+the retained errors to reassess the mechanism rather than promoting simulated
+packets or repeating trials until they pass. All execution stays in disposable
+stores, journals and model contexts; existing ChatGPT quota only.
+
+### Diagnostic decisions retained
+
+The generic 197-byte wording hypothesis is rejected: both conditions passed
+10/15 lexical checks, with actual q08 omissions and q09 substitutions. Changing
+record order also failed; removing metadata is an ineligible ablation and did
+not reliably recover the corrected values. Preserve every answer and the
+semantic exception for the valid `14h50` spelling in the layout review.
+
+The next predeclared diagnostic separates two observed ambiguities in a 2x2
+design: historical data versus latest stored versions, and generic field
+substitution versus method-name/instance-ID confusion. Only the fixed prefix
+varies; JSON record bodies remain byte-identical. The proposed latest/typed
+prefix is 202 bytes, the same length as the current product prefix, with no
+corpus labels or answer values. "Latest stored" describes row version selection
+inside the source snapshot, never independently verified real-world freshness.
+
+Run all 44 declared contexts once and retain each result. Acceptance requires
+all eleven proposed-prefix answers and independent prose review. Report both
+factors separately, including adverse interactions; these simulations never
+replace qualification against a rebuilt executable. Before that final campaign,
+make the transfer corpus executable without editing either frozen corpus and
+require per-answer prose verdicts alongside the unchanged lexical rubric.
+
+### Resumed diagnostic result and target decision
+
+All 129 prospective diagnostic contexts completed without execution/provider
+errors: wording 30, layout 33, semantic factors 44, paragraph placement 22.
+None supports a production fix for the retained response failures. The latest/
+typed prefix passes 8/11 prose checks; separate paragraph placement passes 6/11
+under strict review, including one ambiguous time answer counted as failure.
+Every trial remains available, including false lexical negatives for `14 h 50`
+and a lexical false positive that mentions the time but disclaims an updated one.
+
+No new Rust behavior was changed. The validated ranking correction and its
+408 Memory / 67 MCP tests remain the product source under test. Do not rerun
+those unchanged suites merely to replace the adverse response result.
+
+The installed normal Codex configuration is `gpt-6.1-sol` / `max`, whereas this
+controlled answer proxy uses `gpt-5.6-luna` / `medium`. This is an observed target
+mismatch, not proof that the configured model would succeed. A user clarification
+is pending: qualify the actual configured host/model in a separate prospective
+cohort while keeping Luna failures, or require Luna too and design a different
+caller/answer-validation boundary. Do not silently substitute models or weaken
+the original acceptance. Push and merge remain conditional and unperformed.
+
+### Accepted target — configured Codex
+
+The user explicitly selected qualification on `gpt-6.1-sol` / `max`, preserving
+the Luna failures and limiting the verdict to the tested configuration. The
+prospective [Codex protocol](../../plugins/memory/evidence/codex-qualification-2026-10-23/protocol.json)
+freezes 82 fresh contexts: 24 original paired questions, 12 transfer paired
+questions, and with-recall trials2/3 of each of the five critical cases. Every
+with-recall answer must pass grounded prose review; without-recall safety and
+task completeness are reported separately. Scores and questions stay unchanged.
+
+Reuse the committed source `b828223` and its pinned CLI/MCP binaries and source
+lock. Run actual new MCP/CLI replays in separate scratch stores, followed by the
+committed generic harness from `7054fd5`. Do not apply any rejected prefix or
+layout probe. No source rebuild is needed while the product inputs are unchanged.
+The isolated CLI matches the selected model/effort, not every desktop setting;
+explicit context injection does not establish automatic hook activation.
+
+Before publication: require complete source/binary/raw/episode bindings, all
+with-recall and safety verdicts, an independent review, applicable project checks,
+private-content/history/metadata gates, verified public origin/rights, exact-head
+CI, then the already-authorized push and merge. Preserve every failure and do
+not claim that the new model repairs Luna or proves universal answer quality.
+
+### Configured Codex result and smallest remaining correction
+
+The frozen Q3 campaign completed all82 distinct threads with coherent source,
+binary, prompt, configuration and raw-output bindings. It still fails: q08
+omits the stored11-day retention in trials1/3. q11 clocks14h50 are equivalent
+and pass prose review; q09/q11/q17/q18 pass all3 trials. The strict Q3 result
+also retains q20 as task-incomplete: its question requests current approval,
+but the fixture only states a stored region/tag. Its honest approval caveat is
+grounded. Neither Memory nor a prompt correction may manufacture that approval.
+Q3's unchanged results and the rejected first independent review are preserved.
+
+Next bounded experiment: compare the exact current prefix with the same prefix
+changing only `Historical memory data` to `Latest stored versions`. Both labels
+are22UTF-8bytes; the suffix, LF and each Q3 JSON body stay byte-identical.
+This tests source-version meaning on the accepted Sol/max target, without the
+unnecessary additional type-guard changes from the failed Luna diagnostic.
+Latest stored means the current row in the source snapshot, not outside-world
+freshness, approval or independent factual verification.
+
+Freeze42 new contexts before execution: q08/q09/q11/q17/q18/q20 three times
+per condition, plus h02/h05/h08 once each. Alternate condition order with no
+more than three groups overlapping. All42 get new threads; reuse no prior
+answer as a current control. Preserve every attempt, no retries or substitution.
+Require every candidate response grounded, format/control-correct and complete
+for its available fields, plus at least one actual current-condition failure.
+q20 is prospectively a mixed-data adequacy control: cite the stored region/tag
+and explicitly abstain on undocumented current approval. Its approval-task
+completion stays false in the report. This corrects a fixture expectation for
+future acceptance and never rerates Q3 or changes its lexical scores.
+
+If supported, the only product edit is the22-byte label and matching spec, with
+an envelope regression observed failing first, then passing. Commit source,
+build new CLI/MCP, bind new hashes and rerun relevant native validation followed
+by a full fresh82-context actual-binary campaign. Keep corpus/questions and the
+lexical rubric unchanged; the q20 mixed-data rule must be frozen prospectively.
+If this single-factor diagnostic fails, stop promoting prefix-only changes and
+reassess the answer boundary. Push/merge remain blocked until applicable gates
+are genuinely met; user authorization remains valid.
+
+### Diagnostic result and fixture adequacy repair
+
+Q4 completed42 fresh threads with consistent bindings, then failed its own gate:
+candidate20/21, current19/21. q08 is complete3/3 under the candidate versus1/3
+under the current label. Both current failures falsely deny the supplied11-day
+retention. Candidate q20/trial2 instead gives region plus honest unknown approval
+but omits the stored tag. All6 q20 outputs correctly decline undocumented current
+approval. Q4 remains rejected; no product edit follows from treating20/21 as21/21.
+
+The fixture mixes a stored tag with an absent approval attribute. Prospectively
+split those demands: v2 q20 asks the stored region/tag, with original actions and
+expected values unchanged; new q25 explicitly asks whether approval is documented
+and requires abstention. All24 other original questions and the12 transfer cases
+stay unchanged. The new control adds no stored fact and forbids inventing approval.
+This is an adequacy correction, not a retrospective rerating of Q3/Q4.
+
+Freeze12 new simulated contexts, q20v2/q25 three times under each unchanged Q4
+prefix. Use the same exact Q3 Vesper JSON body and client/model/configuration.
+Require all6 candidate outputs grounded, complete and control/format-correct;
+report all6 current outputs without requiring a current failure in this fixture
+follow-up. The q08 comparison stays Q4's separate finite evidence. If supported,
+apply only the candidate label/spec with an observed failing envelope regression,
+commit/build fresh binaries, then run84 actual contexts:25 primary pairs,12
+transfer pairs,10 critical repeats. All37 with-recall questions and all repeats
+must pass; without-recall abstention and completeness remain separate. Stop on
+new unsupported conclusions or missing available facts; do not tune another
+prefix variant or hide the rejected comparison.
+
+Q5 supports the repaired fixture: all12 actual paragraphs pass,6/6 under each
+unchanged prefix. It measures question adequacy, not an additional label gain.
+The parent accepts the independent review and keeps the Q4 rejection intact.
+The source label is now changed by22bytes only; the existing envelope regression
+first failed on old behavior (exit101, one expected assertion), then all31
+contextual-recall tests passed. Logs bind both exact source-file states.
+The spec limits stored-version meaning to the source snapshot and explicitly
+excludes outside-world freshness or approval. Complete Memory validation,
+new binary/source bindings and the prospective84-context actual campaign still
+remain required before any publication or merge.
+
+
+### Prospective actual-binary campaign on source95bf15b
+
+Full Memory validation now passes408 tests with0failed/ignored;31 contextual
+cases are included, not added again. Fmt and Clippy pass. The corrected explicit
+dual-package build passes, with unchanged149CLI/18MCP inputs and HEAD95bf15b;
+wrong wrapper/package/version commands remain preserved as preparation errors.
+Pinned CLI/MCP hashes and an observed buildMatchesSource=true status now exist.
+
+Independent harness review found missing local-code sealing, prose input binding,
+and complete normalized recall configuration checks. Those are corrected before
+any new model call and the follow-up read-only review passes. Nineteen pre-replay
+tests pass; all22 tests will run after local replay, including3 checks requiring
+new replay evidence. Freeze the Q6 protocol/subject/harness next, then replay
+and verify all37 packets, run the full harness checks, and only then collect84
+predeclared contexts. All47 with-recall paragraphs must pass independently;
+no Q3/Q4 failure is rerated.
+
+
+### Selected Codex qualification accepted
+
+Q6 completed all84 fresh threads on the predeclared source95bf15b and pinned
+CLI/MCP/client. All37 replay packets preserve source data;42 identity/search/list
+and recall controls pass;24 namespaces are empty after cleanup. All22 harness
+checks pass on the actual new replays. No model call was retried or substituted.
+
+Independent42+42 prose reviews and parent84-row review accept all47 with-recall
+answers, including every critical trial. Without recall14/37 are complete and23
+safely abstain or remain appropriately partial. Five lexical false negatives
+remain unchanged and individually reported. One review error on q24 availability
+was corrected in an addendum, with original review retained and no model rerun.
+Mean paired lexical scores are0.9099099099 with and0.4009009009 without recall;
+this is finite-sample evidence, not a global quality/economy/causal claim.
+
+The isolated recorder accepts receiptc784eaac-12fb-4de3-9268-ab004d36de9f as
+reported-satisfied with reviewRequired=true. Fresh status/history verify its
+attached files and buildMatchesSource=true. No readiness artifact is promoted.
+See the [qualification report](../../plugins/memory/evidence/stored-version-qualification-2026-10-23/README.md),
+[84 individual answers](../../plugins/memory/evidence/stored-version-qualification-2026-10-23/results.md)
+and [individual score/review/preparation errors](../../plugins/memory/evidence/stored-version-qualification-2026-10-23/errors.md).
+
+Local implementation and qualification gates are met. The user has explicitly
+authorized push and merge after applicable checks. Remote integration must
+verify the unchanged public origin/account/rights, full private-content gate,
+exact final diff/target, PR checks, remote SHA and the existing main-snapshot
+publication effect. Preserve the source95bf15b object with a merge commit so the
+Git-bound compiled-source proof remains reachable. Another software host was
+excluded by the user; automatic Desktop integration and unattended daily use
+are not claimed by this campaign.
+
+## PR49 integration prerequisites
+
+The first PR49 CI at a753b4b passed workspace tests on all three platforms,
+MSRV, release Memory eval, Clippy and docs. Integration remains blocked by
+an empty-file repo-shape defect, ten verified source-hash Gitleaks false
+positives, and fourteen new advisories in the unchanged main lockfile.
+The [CI integration record](../../plugins/memory/evidence/ci-integration-2026-10-23/README.md)
+owns the minimal fixes, original-result preservation and final-source recheck.
+No failed CI run or prior model answer is discarded. Dependency updates change
+the conservative Memory source fingerprint; the successful Q6 proof remains
+historical until the final source/binaries receive their own qualification.
+Push/merge authorization and the excluded second-host scope remain unchanged.
+
+### Final-source Q7 qualification accepted
+
+Security/ZIP/repo-shape prerequisite source is5eb34e0; protocol and eight
+qualification scripts were frozen in90094e9 before the84new actual Codex
+contexts. New pinned CLI/MCP and source149/18 bindings pass. The same full
+Q6 corpus/rubric is reused without weakening criteria or rewriting old results.
+
+All47with-recall paragraphs pass, including10critical repeats; without recall
+14/37are complete and23safely abstain or remain partial. Five lexical false
+negatives retain original scores. Five independent review classification errors
+were corrected under the predeclared unknown/hostile rubric in preserved addenda;
+no model answer was replaced or rerun. Paired lexical means are0.9459459459
+and0.3738738739, finite-sample delta0.5720720721, with no global/economy claim.
+
+Final-source151patched-consumer tests,31contextual tests,27harness checks,
+formatting and build pass. Six first-attempt Accounts tests failed from full
+C-drive temporary storage; the same command passed using child-only Dtemp.
+The recorder first hit sandbox Access denied before creating state, then the
+same observation succeeded with normal filesystem access. Both failures remain
+recorded. Receipt488792f5-fcb6-426b-b151-8b23716ae0f6 is reported-satisfied,
+with16intact attachments,195proof snapshot files and no readiness promotion.
+
+Independent final proof review passes. See [Q7 verdicts and reproducible protocol](../../plugins/memory/evidence/ci-integration-2026-10-23/README.md),
+[84 individual answers](../../plugins/memory/evidence/ci-integration-2026-10-23/results.md),
+and [individual errors](../../plugins/memory/evidence/ci-integration-2026-10-23/errors.md).
+The authorized delivery still requires final exact-head CI, confidentiality
+checks, verified normal push and merge preserving source Git objects; PR49
+metadata owns that subsequent integration state. No second software host,
+automatic Desktop/full-settings or daily-use readiness is claimed.
+
+Publication packaging follow-up: the final path gate found a Python executable
+path in sealed harness metadata. Preserve original recorder and195inputs in two
+local private copies, with original ledger/receipt archived together. Normalize
+only that metadata token; record a separate public store with16input copies
+and a separate198file public proof bundle. Public receipt3b103385-f0a9-4961-a12a-103a8318a2ff
+is reported-satisfied on the same84answers and scores, with no new model calls.
+The original488792f5 receipt remains historical; its raw path-bearing inputs are
+local only. No published history was rewritten.

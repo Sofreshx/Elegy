@@ -1,0 +1,162 @@
+{
+  "schemaVersion": "memory-second-host-preflight/v1",
+  "startedAt": "2026-10-23T05:08:07.063296+00:00",
+  "host": "OpenCode",
+  "binarySha256": "ea4f4d4bec95cd41baf0fc53adc4e34b31e1c8676dc5b2507c8797ab1884af18",
+  "catalogSha256": "03a6f243756816b06d009b94539de20a08686dce93602008763db9c026cd9eed",
+  "runnerSha256": "3b538b478150702ca7102e3316d340db27500c6b5562d06aaba12ba68b036309",
+  "modelMetadata": {
+    "id": "big-pickle",
+    "providerID": "opencode",
+    "name": "Big Pickle",
+    "family": "big-pickle",
+    "api": {
+      "id": "big-pickle",
+      "url": "https://opencode.ai/zen/v1",
+      "npm": "@ai-sdk/openai-compatible"
+    },
+    "status": "active",
+    "headers": {},
+    "options": {},
+    "cost": {
+      "input": 0,
+      "output": 0,
+      "cache": {
+        "read": 0,
+        "write": 0
+      }
+    },
+    "limit": {
+      "context": 200000,
+      "input": 160000,
+      "output": 32000
+    },
+    "capabilities": {
+      "temperature": true,
+      "reasoning": true,
+      "attachment": false,
+      "toolcall": true,
+      "input": {
+        "text": true,
+        "audio": false,
+        "image": false,
+        "video": false,
+        "pdf": false
+      },
+      "output": {
+        "text": true,
+        "audio": false,
+        "image": false,
+        "video": false,
+        "pdf": false
+      },
+      "interleaved": {
+        "field": "reasoning_content"
+      }
+    },
+    "release_date": "2025-10-17",
+    "variants": {}
+  },
+  "configuration": {
+    "autoupdate": false,
+    "share": "disabled",
+    "snapshot": false,
+    "enabled_providers": [
+      "opencode"
+    ],
+    "model": "opencode/big-pickle",
+    "small_model": "opencode/big-pickle",
+    "plugin": [],
+    "mcp": {},
+    "permission": "deny",
+    "lsp": false,
+    "formatter": false
+  },
+  "commands": [
+    {
+      "name": "version",
+      "argv": [
+        "<installed-opencode>",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdoutSha256": "4a830c412419a3308d095a64e4fd2504b26d1e975366e089d886c03d90fa016c",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "paths",
+      "argv": [
+        "<installed-opencode>",
+        "--pure",
+        "debug",
+        "paths"
+      ],
+      "exitCode": 0,
+      "stdoutSha256": "97216c0b359eaa32b579710d59b04482802b55582a6a8af414d6c9a5d33a5415",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "config",
+      "argv": [
+        "<installed-opencode>",
+        "--pure",
+        "debug",
+        "config"
+      ],
+      "exitCode": 0,
+      "stdoutSha256": "7081a5e9b78778bd92a2491d45eb349cec5ee15b55de6314d42d898a769e600a",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "preflight",
+      "argv": [
+        "<installed-opencode>",
+        "--pure",
+        "run",
+        "--dir",
+        "<isolated-cwd>",
+        "--format",
+        "json",
+        "--model",
+        "opencode/big-pickle",
+        "Do not use tools. Reply with exactly READY."
+      ],
+      "exitCode": 1,
+      "stdoutSha256": "f2f14052ecce2d33bb6335590a70fcea90c49bc8836ab9de3fdf2aa3953333de",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "memoryIntegrationExercised": false,
+  "paidApiCalls": 0,
+  "status": "blocked",
+  "providerErrors": [
+    {
+      "type": "error",
+      "timestamp": 1792732099413,
+      "sessionID": "ses_e98d718aeffeycbTGklMgDw83c",
+      "error": {
+        "name": "APIError",
+        "data": {
+          "message": "OpenCode's free tier can only be used from within OpenCode. Download it at https://opencode.ai and keep building.",
+          "statusCode": 403,
+          "isRetryable": false,
+          "responseHeaders": {
+            "cf-ray": "a4ee391a6f6d43ff-EWR",
+            "connection": "keep-alive",
+            "content-encoding": "br",
+            "content-type": "application/json",
+            "date": "Fri, 23 Oct 2026 05:08:17 GMT",
+            "server": "cloudflare",
+            "transfer-encoding": "chunked",
+            "x-opencode-log-id": "01a16728-ec91-7fb5-b57c-03a1f6faa84c"
+          },
+          "responseBody": "{\"type\":\"error\",\"error\":{\"type\":\"FreeTierError\",\"message\":\"OpenCode's free tier can only be used from within OpenCode. Download it at https://opencode.ai and keep building.\"}}",
+          "metadata": {
+            "url": "https://opencode.ai/zen/v1/chat/completions"
+          }
+        }
+      }
+    }
+  ],
+  "answer": ""
+}

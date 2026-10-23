@@ -1,0 +1,43 @@
+{
+  "answer": "Appliquer le port API **8339** pour Cedar-North. Conserver le transport **mTLS**.",
+  "threadId": "01a1671b-667f-7f30-8cc0-7ba12c276e01",
+  "usage": {
+    "input_tokens": 20722,
+    "cached_input_tokens": 16384,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 68,
+    "reasoning_output_tokens": 39
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a1671b-667f-7f30-8cc0-7ba12c276e01\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Appliquer le port API **8339** pour Cedar-North. Conserver le transport **mTLS**.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20722,\"cached_input_tokens\":16384,\"cache_write_input_tokens\":0,\"output_tokens\":68,\"reasoning_output_tokens\":39}}\n",
+  "stderr": "2026-10-23T04:53:31.410182Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q03",
+  "arm": "with",
+  "startedAt": "2026-10-23T04:53:30.784257+00:00",
+  "completedAt": "2026-10-23T04:53:37.183524+00:00",
+  "elapsedMs": 6400.185,
+  "promptSha256": "7f667ef6438d18387fda6c17d2d0839d3880833598c3bbec116a48d473b6e451",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

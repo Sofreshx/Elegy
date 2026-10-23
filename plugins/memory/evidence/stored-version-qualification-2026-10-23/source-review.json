@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "memory-source-review/v1",
+  "productSourceRevision": "95bf15ba2afa8e7655c45a8127b6a060893b695a",
+  "reviewer": "independent Codex-native review agent; not human",
+  "reviewScope": "337ee88..95bf15b product delta, spec, prospectiveQ6 protocol/corpus/source-lock",
+  "findings": [],
+  "status": "passed-static-review",
+  "checks": [
+    "22byte label change, unchanged envelope fields/JSON and budget",
+    "Existing hostile-envelope regression changed to Latest stored versions",
+    "Spec excludes outside freshness, approval and independent factual verification",
+    "Corpusv2 separates recorded valuesq20 and unknownapprovalq25, prior failures intact",
+    "149 source hashes and corpus hashes match"
+  ],
+  "limits": "Runtime and fullQ6 gates remain separate; no approval inferred from this static review."
+}

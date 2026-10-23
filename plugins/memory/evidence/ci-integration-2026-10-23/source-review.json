@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "memory-source-review/v1",
+  "productSourceRevision": "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1",
+  "reviewer": "Parent final integration judgment with reused independent static reviews and new independent CI/ZIP/native evidence reviews; not human.",
+  "reviewScope": "Final main619f5dd..5eb34e0 source/spec/regression delta; preserved Memory behavior from95bf, dependency and archive adaptation prerequisites.",
+  "status": "passed-static-review",
+  "findings": [],
+  "memoryBehaviorUnchangedSince": "95bf15ba2afa8e7655c45a8127b6a060893b695a",
+  "unchangedMemoryPaths": [
+    "plugins/memory/src/storage/recall_store.rs",
+    "plugins/memory/src/storage/sqlite_store.rs",
+    "plugins/memory/tests/contextual_recall.rs",
+    "docs/specs/memory-contextual-recall-v1/spec.md"
+  ],
+  "reusedAndNewReviewInputs": [
+    {
+      "path": "../recall-fixes-2026-10-23/reviews.json",
+      "sha256": "caf132a8f19e47e477b2fe64e3de6d041c0db20dfed567e5976f9b4263049b55"
+    },
+    {
+      "path": "../stored-version-qualification-2026-10-23/source-review.json",
+      "sha256": "b68466f594210c54877f1871bab3e57be1162304496e8a808c6c2dbc14f5781c"
+    },
+    {
+      "path": "review-ci.json",
+      "sha256": "aeae7aa77d34fec1f770cf85a98f684c51e04cdd98be1fce3015685bde962004"
+    },
+    {
+      "path": "review-zip.json",
+      "sha256": "be41547941b3fc36653eabda6c664503ba0ae293b5f151daca2944efca397ccc"
+    },
+    {
+      "path": "review-final-native.json",
+      "sha256": "17ddb6f53a5b9f8b7661771a7eef20fd2e4104bd885241e6f81322508c72f088"
+    },
+    {
+      "path": "native-validation/precommit-normalization.json",
+      "sha256": "4086123f17b53199b6650d0d48b170d27634c8961f222aa0d87ae1eef0fe2f17"
+    }
+  ],
+  "checks": [
+    "Contextual delivered-text exact-term ranking; ordinary-search BM25/access filters/vector blend preserved.",
+    "Stored-version label never establishes external freshness or approval; current instruction and unknown-attribute rules retained.",
+    "ZIP fallible filenames propagated, malformed archive rejected before writes, archive Unix permissions explicit on Windows.",
+    "Repo-shape empty files accepted, unreadable files blocked, path detection retained.",
+    "Dependency fixes have no vulnerability exceptions; exact-fingerprint source-hash Gitleaks exceptions only.",
+    "Source149/18 and locked binary/code/configuration/raw/review hashes checked; source Git objects retained."
+  ],
+  "limits": "Review does not establish full Desktop settings, automatic hook or other host readiness. Exact final-head CI remains separate."
+}

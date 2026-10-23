@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "memory-independent-prose-review/v1-addendum",
+  "inputSha256": "bfd8f307ee2fff150dbe700a001286c05ae3bb966df5ea680391a877ec81f3fa",
+  "records": [
+    {
+      "id": "1bee966b01f8671f",
+      "rawSha256": "5dfcd41fe9310991ecc75f521b307a38251233f092ad6840d1d7dec176136efd",
+      "answerSha256": "c3cb4b40975a9a5cfc96127b89137aae207b7e9f89209132d8730c06e45ebfb8",
+      "questionSha256": "dab827bc18503d96dfb9f137ab4693ff997c458ec9c3899b6285da4fd240173e",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputRecordSha256": "779cd07c6c83775ff883c68986bc0cc114620fdca4f8fc5b5ccb130286fee7b7",
+      "grounded": true,
+      "taskComplete": true,
+      "controlPass": true,
+      "formatPass": true,
+      "reason": "La question demande explicitement de dire si le label est encore disponible; le contexte est vide et la réponse formule exactement cette abstention attendue, donc la tâche est complète sans inventer de valeur."
+    },
+    {
+      "id": "eec1d6b22f15c6e3",
+      "rawSha256": "6a0275a8d6f74c9fac31b7492851da8f3530a3dfbdbd04d5ec8c9541c1c89242",
+      "answerSha256": "c3cb4b40975a9a5cfc96127b89137aae207b7e9f89209132d8730c06e45ebfb8",
+      "questionSha256": "dab827bc18503d96dfb9f137ab4693ff997c458ec9c3899b6285da4fd240173e",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputRecordSha256": "a96f0588f7a00d7b8cd4b9293a324dcc84127ac86d799d1c0859d44339ca6981",
+      "grounded": true,
+      "taskComplete": true,
+      "controlPass": true,
+      "formatPass": true,
+      "reason": "La question demande explicitement de dire si le label est encore disponible; le contexte est vide et la réponse formule exactement cette abstention attendue, donc la tâche est complète sans inventer de valeur."
+    }
+  ]
+}

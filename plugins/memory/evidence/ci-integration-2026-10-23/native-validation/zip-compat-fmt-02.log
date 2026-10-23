@@ -1,0 +1,5 @@
+observed-summary-not-raw=true
+command=cargo fmt --all -- --check
+exitCode=0
+result=No formatting differences reported.
+rawLogAvailable=false

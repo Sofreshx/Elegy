@@ -1,0 +1,10 @@
+ParentContainsErrorRecordException: <local-path>
+Line |
+  77 |      $match = [regex]::Match($text, $localPathPattern)
+     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Exception calling "Match" with "2" argument(s): "Value cannot be null. (Parameter 'input')"
+Exception: <local-path>
+Line |
+  46 |  … -ne "bad.txt") { throw "real non-empty local-path detection failed" }
+     |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | real non-empty local-path detection failed

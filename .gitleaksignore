@@ -1,0 +1,12 @@
+# Exact historical false positives: resource_auth.rs source SHA-256 fields.
+# Each value was checked against immutable product source 95bf15b; no credential suppression.
+2d4f788285a3b42ae905e9d73bb2b28910bb8a84:plugins/memory/evidence/stored-version-qualification-2026-10-23/native-validation/build-02.json:generic-api-key:337
+2d4f788285a3b42ae905e9d73bb2b28910bb8a84:plugins/memory/evidence/stored-version-qualification-2026-10-23/native-validation/build-02.json:generic-api-key:357
+2d4f788285a3b42ae905e9d73bb2b28910bb8a84:plugins/memory/evidence/stored-version-qualification-2026-10-23/native-validation/build.json:generic-api-key:333
+2d4f788285a3b42ae905e9d73bb2b28910bb8a84:plugins/memory/evidence/stored-version-qualification-2026-10-23/native-validation/build.json:generic-api-key:353
+2d4f788285a3b42ae905e9d73bb2b28910bb8a84:plugins/memory/evidence/stored-version-qualification-2026-10-23/native-validation/clippy.json:generic-api-key:335
+2d4f788285a3b42ae905e9d73bb2b28910bb8a84:plugins/memory/evidence/stored-version-qualification-2026-10-23/native-validation/clippy.json:generic-api-key:355
+2d4f788285a3b42ae905e9d73bb2b28910bb8a84:plugins/memory/evidence/stored-version-qualification-2026-10-23/native-validation/fmt.json:generic-api-key:328
+2d4f788285a3b42ae905e9d73bb2b28910bb8a84:plugins/memory/evidence/stored-version-qualification-2026-10-23/native-validation/fmt.json:generic-api-key:348
+2d4f788285a3b42ae905e9d73bb2b28910bb8a84:plugins/memory/evidence/stored-version-qualification-2026-10-23/native-validation/memory.json:generic-api-key:331
+2d4f788285a3b42ae905e9d73bb2b28910bb8a84:plugins/memory/evidence/stored-version-qualification-2026-10-23/native-validation/memory.json:generic-api-key:351

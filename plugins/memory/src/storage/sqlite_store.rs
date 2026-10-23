@@ -4725,9 +4725,14 @@ fn load_keyword_scores_with_access(
 
     let mut params: Vec<rusqlite::types::Value> = vec![rusqlite::types::Value::from(fts_query)];
     let scope_clause = scope_in_clause("m.scope", scopes, &mut params);
+    let recall_fields = if access.is_some() {
+        "m.content, m.summary"
+    } else {
+        "NULL, NULL"
+    };
     let mut sql = format!(
         r#"
-        SELECT m.id, bm25(memories_fts) AS bm25_score
+        SELECT m.id, bm25(memories_fts) AS bm25_score, {recall_fields}
         FROM memories_fts
         JOIN memories m ON m.rowid = memories_fts.rowid
         WHERE memories_fts MATCH ?1
@@ -4771,7 +4776,21 @@ fn load_keyword_scores_with_access(
     let mut statement = connection.prepare(&sql)?;
     let rows = statement.query_map(rusqlite::params_from_iter(params), |row| {
         let raw_id: String = row.get(0)?;
-        Ok((parse_uuid_for_sqlite(&raw_id)?, row.get::<_, f64>(1)?))
+        let exact_matches = if access.is_some() {
+            let content: String = row.get(2)?;
+            let summary: Option<String> = row.get(3)?;
+            recall_store::lexical_match_count(
+                text,
+                recall_store::recall_text(&content, summary.as_deref()),
+            )
+        } else {
+            0
+        };
+        Ok((
+            parse_uuid_for_sqlite(&raw_id)?,
+            row.get::<_, f64>(1)?,
+            exact_matches,
+        ))
     })?;
 
     let mut raw_matches = Vec::new();
@@ -4782,17 +4801,37 @@ fn load_keyword_scores_with_access(
         return Ok(HashMap::new());
     }
 
+    if access.is_some() {
+        // BM25 rewards shorter near-name records and min/max normalization can
+        // turn another applicable record into a zero. Recall instead compares
+        // distinct exact surface terms in the delivered snippet. This remains
+        // relative relevance, not confidence or a project security boundary.
+        let best_count = raw_matches
+            .iter()
+            .map(|(_, _, count)| *count)
+            .max()
+            .unwrap_or(0);
+        return Ok(raw_matches
+            .into_iter()
+            .filter(|(_, _, count)| *count > 0)
+            .map(|(id, _, count)| {
+                let score = count as f32 / best_count as f32;
+                (id, score)
+            })
+            .collect());
+    }
+
     let best_score = raw_matches
         .iter()
-        .map(|(_, score)| *score)
+        .map(|(_, score, _)| *score)
         .fold(f64::INFINITY, f64::min);
     let worst_score = raw_matches
         .iter()
-        .map(|(_, score)| *score)
+        .map(|(_, score, _)| *score)
         .fold(f64::NEG_INFINITY, f64::max);
 
     let mut normalized_scores = HashMap::with_capacity(raw_matches.len());
-    for (id, raw_score) in raw_matches {
+    for (id, raw_score, _) in raw_matches {
         let normalized = if (worst_score - best_score).abs() < f64::EPSILON {
             1.0
         } else {

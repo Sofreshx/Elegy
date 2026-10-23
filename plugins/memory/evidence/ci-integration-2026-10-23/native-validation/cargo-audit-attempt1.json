@@ -1,0 +1,5 @@
+{
+  "status": "recording-error",
+  "error": "Audit wrapper assumed every warning has non-null advisory and versions objects; AttributeError prevented recording. Audit exit was not retained, so no pass inferred.",
+  "correctiveAction": "Handle nullable warning fields and run installed cargo audit again against the same locked candidate. No advisory suppressed."
+}

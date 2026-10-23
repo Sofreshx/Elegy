@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "memory-publication-derivatives/v1",
+  "purpose": "Publication-only metadata normalization, with original recorder retained and independently verified. Same84model outputs, source, binary, protocol and scores.",
+  "originalReceiptId": "488792f5-fcb6-426b-b151-8b23716ae0f6",
+  "originalReceiptMetadataArchive": "recorder-original",
+  "originalRecorderLocalSnapshot": "runtime/pre-publication-recorder",
+  "verifiedLocalBackupOutsideTemporaryWorktree": "<canonical-repo>/.tmp/memory-evidence-original-20261023",
+  "originalSnapshotStatus": "reported-satisfied",
+  "originalSnapshotStaleReasons": [],
+  "originalProofManifest": {
+    "path": "proof-manifest.json",
+    "sha256": "e4c39b0f92e386806fa141075830212508239bee9cab48aaa3f466581cdfcae0",
+    "scope": "Historical195file snapshot before publication derivative; original bytes remain in both private local snapshots. Use public-proof-manifest.json for current public bundle."
+  },
+  "transformSource": {
+    "path": "publication_derivatives.py",
+    "sha256": "1c4c537067c8a9e39307df118852d1114ed99d48366599cd85bd08a0e974263c"
+  },
+  "files": [
+    {
+      "path": "native-validation/harness-final.json",
+      "rawSha256": "fb19fa6003b431e6bcb31b984643da3e6968a268976a72e3417afe807b22f930",
+      "publicSha256": "33209dbb451b0e178d7f3c5572044f922b41f279c7cf71c675cd142be74a80c7",
+      "function": "python_metadata",
+      "transform": "Replace exactly the JSON argv[0] executable string with <python>; preserve every other UTF-8 byte and all result fields."
+    },
+    {
+      "path": "native-validation/repo-shape-final-tree.log",
+      "rawSha256": "7d05c0690b549216547536c74f379175e8c875ce7f9177799706e8143c4a2d08",
+      "publicSha256": "3b4dae5776e34241d088aa908cb7be9a6157d914d1e8f02a2afd7cc8eff36c08",
+      "function": "shape_diagnostic",
+      "transform": "Replace exactly one matched local-path prefix; all other bytes retained."
+    }
+  ],
+  "historicalReceiptOutputs": [
+    "record-output-02.json",
+    "qualification-status.json",
+    "qualification-history.json",
+    "receipt-summary.json"
+  ],
+  "newPublicRecorder": "recorder-public",
+  "publicRecorderScope": "Qualification store with16regular input copies only. The complete public evidence bundle and its manifest remain separately at the Q7 campaign root.",
+  "remoteBackup": "Original path-bearing snapshot is local only. Public neutralized proof and original receipt metadata are intended for the authorized task branch."
+}

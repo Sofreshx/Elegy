@@ -1,0 +1,145 @@
+{
+  "schemaVersion": "memory-realistic-reuse/v1",
+  "pullRequest": {
+    "url": "https://github.com/Sofreshx/Elegy/pull/48",
+    "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+    "merge": "619f5dd705e6383a12b7d806369633df291fc1a3",
+    "mergedAt": "2026-10-04T20:08:22Z"
+  },
+  "checks": [
+    {
+      "name": "CodeQL",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/runs/111519061301",
+      "completedAt": "2026-10-04T20:02:05Z"
+    },
+    {
+      "name": "zizmor",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/runs/111518002459",
+      "completedAt": "2026-10-04T19:56:34Z"
+    },
+    {
+      "name": "docs check v2 (authoritative)",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154875/job/111517948442",
+      "completedAt": "2026-10-04T19:56:43Z"
+    },
+    {
+      "name": "cargo run -p elegy-memory -- eval run --ci",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154875/job/111517948383",
+      "completedAt": "2026-10-04T19:57:04Z"
+    },
+    {
+      "name": "test (ubuntu-latest)",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154875/job/111517948349",
+      "completedAt": "2026-10-04T20:00:13Z"
+    },
+    {
+      "name": "test (windows-latest)",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154875/job/111517948344",
+      "completedAt": "2026-10-04T20:07:21Z"
+    },
+    {
+      "name": "clippy",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154875/job/111517948338",
+      "completedAt": "2026-10-04T19:56:47Z"
+    },
+    {
+      "name": "fmt",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154875/job/111517948337",
+      "completedAt": "2026-10-04T19:56:34Z"
+    },
+    {
+      "name": "packaging smoke",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154875/job/111517948324",
+      "completedAt": "2026-10-04T19:56:52Z"
+    },
+    {
+      "name": "test (macos-latest)",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154875/job/111517948312",
+      "completedAt": "2026-10-04T19:59:35Z"
+    },
+    {
+      "name": "msrv check (Rust 1.88)",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154875/job/111517948224",
+      "completedAt": "2026-10-04T19:57:13Z"
+    },
+    {
+      "name": "cargo-deny",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154907/job/111517948195",
+      "completedAt": "2026-10-04T19:56:37Z"
+    },
+    {
+      "name": "zizmor",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154903/job/111517948165",
+      "completedAt": "2026-10-04T19:56:39Z"
+    },
+    {
+      "name": "cargo-audit",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154907/job/111517948117",
+      "completedAt": "2026-10-04T19:56:32Z"
+    },
+    {
+      "name": "gitleaks",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154907/job/111517948040",
+      "completedAt": "2026-10-04T19:56:19Z"
+    },
+    {
+      "name": "codeql",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154907/job/111517947950",
+      "completedAt": "2026-10-04T20:02:11Z"
+    },
+    {
+      "name": "export contracts bundle",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154827/job/111517947784",
+      "completedAt": "2026-10-04T19:56:43Z"
+    },
+    {
+      "name": "package installer bootstrap",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154827/job/111517947676",
+      "completedAt": "2026-10-04T19:56:22Z"
+    },
+    {
+      "name": "contracts-validate",
+      "conclusion": "success",
+      "head": "83adf0f59abee8dfc3fdfd1abcd469260885834d",
+      "url": "https://github.com/Sofreshx/Elegy/actions/runs/37230154808/job/111517947585",
+      "completedAt": "2026-10-04T19:57:01Z"
+    }
+  ],
+  "reuse": "Historical passed suites on PR48 head; source tree of Memory/MCP/shared matches current merge. Not relabelled as new test execution. New qualification tests operate on dedicated current source/binary bindings."
+}

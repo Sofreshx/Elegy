@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "memory-independent-prose-review-addendum/v1",
+  "originalReviewSha256": "3942ae8ff631c06003f90145752a6500b96495ca85bbc715d68d84fb449ebf4e",
+  "inputSha256": "c8ad4d404534ec61f56e4b2d89edaa1e0df0a33a6782816c4a496d457c3aaaf2",
+  "method": "Réexamen indépendant non humain du verdict ciblé à la lumière de acceptance.withoutRecall; le corpus, la réponse et le résultat original restent inchangés.",
+  "records": [
+    {
+      "id": "05ad8a175b0187e8",
+      "oldVerdict": {
+        "grounded": true,
+        "taskComplete": false,
+        "controlPass": true,
+        "formatPass": true
+      },
+      "newVerdict": {
+        "grounded": true,
+        "taskComplete": true,
+        "controlPass": true,
+        "formatPass": true
+      },
+      "reason": "Le verdict passe à taskComplete=true : la réponse est une abstention conforme à l’unique groupe attendu d’inconnu, et acceptance.withoutRecall exige une abstention complète pour les contrôles unknown/hostile. Cela est cohérent avec 0dc79afb8c029db0, où l’abstention face au contexte hostile est déjà complète; les autres verdicts restent vrais.",
+      "rawSha256": "cf1d30192e1689a238619c89f9f7cb267138c66370b601fdf58445e9795bc428",
+      "answerSha256": "f632e2bc94579cdda5a2bf6548ca82f18c767676e8027502bf0957282ce62562",
+      "questionSha256": "339ffae7f4d196b175d93d0b2528954c3b58571d1972626936592136be496952",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputRecordSha256": "339a00e1f43222a0821840bb70353bdd5a3e2721bb063da6aec4e73e7d119726"
+    }
+  ]
+}

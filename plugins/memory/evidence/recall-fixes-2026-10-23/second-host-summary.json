@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "memory-second-host-summary/v1",
+  "host": "Installed OpenCode 1.18.21",
+  "status": "blocked",
+  "evidence": "second-host-02/run.json",
+  "reason": "Actual isolated zero-cost provider preflight rejected with HTTP 403 FreeTierError. No paid fallback, authentication change, installation, persistent server or real Memory access.",
+  "memoryIntegrationExercised": false,
+  "distinction": "A different installed software host; fresh Codex contexts do not establish this guarantee.",
+  "harnessAttempts": [
+    {
+      "evidence": "second-host-01/run.json",
+      "outcome": "Harness assumed JSON paths; host emits a text table. Stopped before model call."
+    },
+    {
+      "evidence": "second-host-02/run.json",
+      "outcome": "Parser corrected; scratch paths and deny-all config verified before actual free-provider preflight; HTTP403."
+    }
+  ],
+  "documentation": [
+    "https://opencode.ai/docs/config/",
+    "https://opencode.ai/docs/permissions/",
+    "https://opencode.ai/docs/cli/"
+  ]
+}

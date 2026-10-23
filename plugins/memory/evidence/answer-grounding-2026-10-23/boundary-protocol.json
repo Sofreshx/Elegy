@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "memory-instruction-boundary-diagnostic/v1",
+  "predeclared": true,
+  "hypothesis": "The fixed program-owned envelope policy is currently placed under a historical-data heading, alongside records declared to be non-instructional. Separating only that exact policy from the quoted JSON records may change evidence use. Prior wording and layout probes did not resolve q08/q09; they do not establish a model or host cause.",
+  "conditions": ["data-labeled", "separate-policy"],
+  "policySource": "Exact prefix before the first LF of each original qualified replay packet; require identical prefix for all selected cases. No candidate wording, question, field, value or record transformation.",
+  "separatePolicyInstruction": "\n\nConsigne fixe de lecture fournie par le programme Memory :\n",
+  "cases": [
+    {"id": "q08", "trials": 3},
+    {"id": "q09", "trials": 3},
+    {"id": "q11", "trials": 3},
+    {"id": "q17", "trials": 1},
+    {"id": "q18", "trials": 1}
+  ],
+  "totalContexts": 22,
+  "variables": "Only placement of the exact existing program-owned fixed policy. data-labeled uses the unchanged original prompt. separate-policy appends the exact prefix to the current instruction and passes only the byte-identical JSON body as historical data. Identical model, effort, question, records and client configuration.",
+  "ordering": "Two conditions circularly rotated by case/trial; at most three groups overlap; conditions sequential within each group.",
+  "roleLimit": "Both policies still travel in the same user prompt passed to Codex exec. This isolates paragraph placement and labeling, not a technical system/developer-role boundary. Do not claim a higher-priority instruction channel was tested.",
+  "acceptance": "All eleven separate-policy outputs must pass independent prose review and all Harbor controls; a reproduced targeted failure in data-labeled is required. No script-level product pass flag. Even a successful result only motivates a concrete caller-boundary design and cannot qualify a changed binary or silently change the frozen product acceptance.",
+  "failurePolicy": "Retain all22 outputs without retry, substitution or selective reporting. If the placement hypothesis fails, no further generic prefix tuning is justified by these probes; require a material host/answer-validation design decision.",
+  "productIsModified": false,
+  "paidApiCalls": 0
+}

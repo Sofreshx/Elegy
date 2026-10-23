@@ -1,0 +1,43 @@
+{
+  "answer": "Dans Harbor, conserve les traces pendant **75 minutes** et utilise le mécanisme de déduplication **REPLAY_PINE**.",
+  "threadId": "01a1686e-85b2-77a3-8ade-ae58e6b81224",
+  "usage": {
+    "input_tokens": 26515,
+    "cached_input_tokens": 21504,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 303,
+    "reasoning_output_tokens": 270
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a1686e-85b2-77a3-8ade-ae58e6b81224\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Dans Harbor, conserve les traces pendant **75 minutes** et utilise le mécanisme de déduplication **REPLAY_PINE**.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26515,\"cached_input_tokens\":21504,\"cache_write_input_tokens\":0,\"output_tokens\":303,\"reasoning_output_tokens\":270}}\n",
+  "stderr": "2026-10-23T11:03:56.101932Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q18",
+  "arm": "with",
+  "startedAt": "2026-10-23T11:03:55.710918+00:00",
+  "completedAt": "2026-10-23T11:04:10.077490+00:00",
+  "elapsedMs": 14367.433,
+  "promptSha256": "28325f580843ab1bfb50cd66eb8c53c77534d3372a10950e380f3d67cb73e239",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

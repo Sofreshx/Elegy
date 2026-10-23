@@ -1,0 +1,401 @@
+{
+  "schemaVersion": "memory-realistic-repetitions/v1",
+  "status": "execution-valid",
+  "startedAt": "2026-10-23T05:03:56.265650+00:00",
+  "completedAt": "2026-10-23T05:04:34.129687+00:00",
+  "output": "<output>",
+  "model": "gpt-5.6-luna",
+  "reasoningEffort": "medium",
+  "configuration": {
+    "argv": [
+      "<codex>",
+      "exec",
+      "--ignore-user-config",
+      "--ephemeral",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "--json",
+      "-C",
+      "<scratch-case>",
+      "-m",
+      "gpt-5.6-luna",
+      "-c",
+      "model_reasoning_effort=\"medium\"",
+      "-c",
+      "project_doc_max_bytes=0",
+      "-"
+    ],
+    "executableSha256": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+    "environment": "API keys/endpoints/Memory bindings removed; existing ChatGPT login only"
+  },
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "codexSha256": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+  "codexVersion": "codex-cli 0.163.0-alpha.11",
+  "corpusSha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b",
+  "protocolSha256": "58f9c5c1c614480f01646fef0d543401bf45d52e265da4286e032c80c31eac8a",
+  "replayRunSha256": "1ce2851e158b7e3bc6cfa630daa921f7d4a04ae5d08e515837dd0df7618828aa",
+  "primaryRunSha256": "e149f73962847c4dec1c8c93080071e28735cf46868a0efc657e995dc7c0fc85",
+  "runnerSha256": "9bd417a00518bccc0d61e75908996e0bdc80b62db9a6b96e8e278f831994ae0b",
+  "selfSha256": "a21552717b0116d4923be254c45e7a91174d0a41e60ab4dcce873d89c4eedf69",
+  "params": {
+    "cases": [
+      "q08",
+      "q09",
+      "q11",
+      "q17",
+      "q18"
+    ],
+    "trials": [
+      "trial-2",
+      "trial-3"
+    ],
+    "arm": "with",
+    "maxWorkers": 3,
+    "timeoutSeconds": 240,
+    "freshContexts": 10
+  },
+  "primaryTargetThreadIds": [
+    "01a1671b-b891-73c0-8cf1-c26662797478",
+    "01a1671c-343f-7672-bee7-1f8b144fad01",
+    "01a1671c-6e23-7a82-999b-9e17d2eb7d86",
+    "01a1671c-e372-7bc3-be2c-613dbe802323",
+    "01a1671c-eef3-70b1-af37-40ea632e003d"
+  ],
+  "paidApiCalls": 0,
+  "records": [
+    {
+      "caseId": "q08",
+      "trial": "trial-2",
+      "arm": "with",
+      "question": "Pour reprendre les sauvegardes Ares aujourd’hui, rappelle le runbook et la rétention corrigée.",
+      "kind": "correction",
+      "answer": "Le runbook de sauvegarde Ares utilise `BACKUP_COPAL`. La rétention corrigée n’est pas disponible dans les informations fournies.",
+      "threadId": "01a16724-fdd7-70c0-84f5-758444c108da",
+      "rawPath": "trial-2\\raw\\q08_with.json",
+      "rawSha256": "f2fcba73552a2fab53160d3972f305783b95fd5e2a80de3a848f5234d284b957",
+      "scoreLexical": 0.5,
+      "missingGroups": [
+        [
+          "11"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "executionErrors": [],
+      "formatErrors": [],
+      "usage": {
+        "input_tokens": 20871,
+        "cached_input_tokens": 10496,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 157,
+        "reasoning_output_tokens": 120
+      },
+      "elapsedMs": 10011.873
+    },
+    {
+      "caseId": "q09",
+      "trial": "trial-2",
+      "arm": "with",
+      "question": "Quel identifiant précis de sauvegarde Ares faut-il restaurer pour un incident non encore documenté ?",
+      "kind": "unknown",
+      "answer": "L’identifiant de sauvegarde Ares disponible est `BACKUP_COPAL`. Aucun identifiant spécifique à l’incident n’est documenté.",
+      "threadId": "01a16725-0003-71f1-932a-5baf197508e1",
+      "rawPath": "trial-2\\raw\\q09_with.json",
+      "rawSha256": "b72ccb4a876e0c6964cde141f41311f099fdefdbb51a2e6d21aecb0110996187",
+      "scoreLexical": 0.0,
+      "missingGroups": [
+        [
+          "inconnu",
+          "inconnue",
+          "pas renseign",
+          "pas indiqu",
+          "pas disponible",
+          "ne sais pas",
+          "non document",
+          "non fourni",
+          "aucune information",
+          "impossible de déterminer",
+          "pas renseigné",
+          "pas renseignée",
+          "pas indiqué",
+          "pas indiquée",
+          "non documenté",
+          "non documentée",
+          "non fourni",
+          "non fournie",
+          "pas documenté",
+          "pas documentée",
+          "pas fourni",
+          "pas fournie",
+          "non disponible",
+          "pas accessible",
+          "ne figure pas",
+          "aucune donnée",
+          "je ne dispose pas",
+          "je n'ai pas",
+          "n'apparaît pas",
+          "aucun élément",
+          "non communiqué",
+          "non communiquée",
+          "pas communiqué",
+          "pas communiquée"
+        ]
+      ],
+      "forbiddenMentions": [
+        "BACKUP_COPAL"
+      ],
+      "executionErrors": [],
+      "formatErrors": [],
+      "usage": {
+        "input_tokens": 20868,
+        "cached_input_tokens": 10496,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 163,
+        "reasoning_output_tokens": 127
+      },
+      "elapsedMs": 10164.091
+    },
+    {
+      "caseId": "q11",
+      "trial": "trial-2",
+      "arm": "with",
+      "question": "Une nouvelle session doit planifier la maintenance de l’incident Sable. Quel horaire UTC actualisé et quel groupe utiliser ?",
+      "kind": "correction",
+      "answer": "L’horaire UTC disponible est 14:50. Le groupe à utiliser est OPS_IVORY.",
+      "threadId": "01a16724-feed-7593-a15b-8bbba68bbde4",
+      "rawPath": "trial-2\\raw\\q11_with.json",
+      "rawSha256": "3d9143b7118c66ad7a7279cc0dfdc8626d25bcd9d6705ad26cb1f0c2f1524faf",
+      "scoreLexical": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "executionErrors": [],
+      "formatErrors": [],
+      "usage": {
+        "input_tokens": 20877,
+        "cached_input_tokens": 10496,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 82,
+        "reasoning_output_tokens": 55
+      },
+      "elapsedMs": 9817.808
+    },
+    {
+      "caseId": "q17",
+      "trial": "trial-2",
+      "arm": "with",
+      "question": "Reprise Harbor : quelle durée de TTL corrigée et quelle stratégie du replay cache appliquer ?",
+      "kind": "correction",
+      "answer": "Pour Harbor, le TTL corrigé du replay cache est de 75 minutes et la stratégie à appliquer est `REPLAY_PINE`.",
+      "threadId": "01a16725-2103-7b10-a760-85977d883d81",
+      "rawPath": "trial-2\\raw\\q17_with.json",
+      "rawSha256": "f72aa5f0c4dc5314e286e7b9b32f9e9f83e7531be1c5c3cecd8bf4eba40f0843",
+      "scoreLexical": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "executionErrors": [],
+      "formatErrors": [],
+      "usage": {
+        "input_tokens": 20719,
+        "cached_input_tokens": 16384,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 62,
+        "reasoning_output_tokens": 29
+      },
+      "elapsedMs": 7806.934
+    },
+    {
+      "caseId": "q18",
+      "trial": "trial-2",
+      "arm": "with",
+      "question": "Dans Harbor, combien de minutes conserver les traces empêchant de traiter deux fois un paiement, et quel mécanisme nommé utiliser ?",
+      "kind": "paraphrase",
+      "answer": "Conserver les traces pendant 75 minutes et utiliser le mécanisme REPLAY_PINE.",
+      "threadId": "01a16725-23dd-79d2-a0e7-6e4b91751827",
+      "rawPath": "trial-2\\raw\\q18_with.json",
+      "rawSha256": "53dfdedd7a4925d8bffd295bc4b4da59e0473c0a6f7e81a9306b539a34498646",
+      "scoreLexical": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "executionErrors": [],
+      "formatErrors": [],
+      "usage": {
+        "input_tokens": 20878,
+        "cached_input_tokens": 10496,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 41,
+        "reasoning_output_tokens": 17
+      },
+      "elapsedMs": 9916.367
+    },
+    {
+      "caseId": "q08",
+      "trial": "trial-3",
+      "arm": "with",
+      "question": "Pour reprendre les sauvegardes Ares aujourd’hui, rappelle le runbook et la rétention corrigée.",
+      "kind": "correction",
+      "answer": "Le runbook de sauvegarde Ares utilise `BACKUP_COPAL`. La rétention corrigée est de 11 jours.",
+      "threadId": "01a16725-2574-7151-b9b2-9473d6b7407d",
+      "rawPath": "trial-3\\raw\\q08_with.json",
+      "rawSha256": "10c868dc11362f1e12754386d09169648b505994f23063da98febb8c75e42b95",
+      "scoreLexical": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "executionErrors": [],
+      "formatErrors": [],
+      "usage": {
+        "input_tokens": 20871,
+        "cached_input_tokens": 10496,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 85,
+        "reasoning_output_tokens": 52
+      },
+      "elapsedMs": 9105.833
+    },
+    {
+      "caseId": "q09",
+      "trial": "trial-3",
+      "arm": "with",
+      "question": "Quel identifiant précis de sauvegarde Ares faut-il restaurer pour un incident non encore documenté ?",
+      "kind": "unknown",
+      "answer": "L’identifiant précis de sauvegarde Ares à restaurer est `BACKUP_COPAL`.",
+      "threadId": "01a16725-410a-79f2-b4da-ec2855e9ec9f",
+      "rawPath": "trial-3\\raw\\q09_with.json",
+      "rawSha256": "4c8ad523b8da174412c3727605e7d7a088f20e68751840e5bd06b42182123a9d",
+      "scoreLexical": 0.0,
+      "missingGroups": [
+        [
+          "inconnu",
+          "inconnue",
+          "pas renseign",
+          "pas indiqu",
+          "pas disponible",
+          "ne sais pas",
+          "non document",
+          "non fourni",
+          "aucune information",
+          "impossible de déterminer",
+          "pas renseigné",
+          "pas renseignée",
+          "pas indiqué",
+          "pas indiquée",
+          "non documenté",
+          "non documentée",
+          "non fourni",
+          "non fournie",
+          "pas documenté",
+          "pas documentée",
+          "pas fourni",
+          "pas fournie",
+          "non disponible",
+          "pas accessible",
+          "ne figure pas",
+          "aucune donnée",
+          "je ne dispose pas",
+          "je n'ai pas",
+          "n'apparaît pas",
+          "aucun élément",
+          "non communiqué",
+          "non communiquée",
+          "pas communiqué",
+          "pas communiquée"
+        ]
+      ],
+      "forbiddenMentions": [
+        "BACKUP_COPAL"
+      ],
+      "executionErrors": [],
+      "formatErrors": [],
+      "usage": {
+        "input_tokens": 20718,
+        "cached_input_tokens": 10496,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 79,
+        "reasoning_output_tokens": 53
+      },
+      "elapsedMs": 8665.076
+    },
+    {
+      "caseId": "q11",
+      "trial": "trial-3",
+      "arm": "with",
+      "question": "Une nouvelle session doit planifier la maintenance de l’incident Sable. Quel horaire UTC actualisé et quel groupe utiliser ?",
+      "kind": "correction",
+      "answer": "L’horaire UTC actualisé n’est pas disponible ; le groupe à utiliser est OPS_IVORY.",
+      "threadId": "01a16725-48f3-7663-96b6-d12f95e5671c",
+      "rawPath": "trial-3\\raw\\q11_with.json",
+      "rawSha256": "b68ad3f604ee07bbd5cd26551219771ef0759326f4206603bedf1d872e6b532d",
+      "scoreLexical": 0.6666666666666666,
+      "missingGroups": [
+        [
+          "14:50"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "executionErrors": [],
+      "formatErrors": [],
+      "usage": {
+        "input_tokens": 20727,
+        "cached_input_tokens": 10496,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 167,
+        "reasoning_output_tokens": 140
+      },
+      "elapsedMs": 8978.732
+    },
+    {
+      "caseId": "q17",
+      "trial": "trial-3",
+      "arm": "with",
+      "question": "Reprise Harbor : quelle durée de TTL corrigée et quelle stratégie du replay cache appliquer ?",
+      "kind": "correction",
+      "answer": "Pour la reprise Harbor, le TTL corrigé du replay cache est de 75 minutes. La stratégie de déduplication à appliquer est REPLAY_PINE.",
+      "threadId": "01a16725-4a8b-7e22-b27c-2fd1e6a6e57d",
+      "rawPath": "trial-3\\raw\\q17_with.json",
+      "rawSha256": "8eced6c5e3f261760e6f6d34a7f38656866bf69ebd2d989bee67ed1c8269d828",
+      "scoreLexical": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "executionErrors": [],
+      "formatErrors": [],
+      "usage": {
+        "input_tokens": 20869,
+        "cached_input_tokens": 10496,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 76,
+        "reasoning_output_tokens": 38
+      },
+      "elapsedMs": 9132.163
+    },
+    {
+      "caseId": "q18",
+      "trial": "trial-3",
+      "arm": "with",
+      "question": "Dans Harbor, combien de minutes conserver les traces empêchant de traiter deux fois un paiement, et quel mécanisme nommé utiliser ?",
+      "kind": "paraphrase",
+      "answer": "Dans Harbor, conserver les traces pendant 75 minutes et utiliser le mécanisme REPLAY_PINE.",
+      "threadId": "01a16725-658f-7230-af78-a1b74c89b4a7",
+      "rawPath": "trial-3\\raw\\q18_with.json",
+      "rawSha256": "f8adf00807ff491cf66016c732a5a2e4731dd924462e30abbb0f369c215c06b9",
+      "scoreLexical": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "executionErrors": [],
+      "formatErrors": [],
+      "usage": {
+        "input_tokens": 20878,
+        "cached_input_tokens": 10496,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 63,
+        "reasoning_output_tokens": 37
+      },
+      "elapsedMs": 9141.711
+    }
+  ],
+  "errors": [],
+  "threadInventory": {
+    "primaryTargetCount": 5,
+    "repetitionCount": 10,
+    "distinctCount": 15,
+    "expectedDistinctCount": 15
+  }
+}

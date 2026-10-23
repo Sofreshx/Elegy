@@ -1,0 +1,5 @@
+{
+  "status": "environment-error",
+  "exitCode": 101,
+  "reason": "Sandbox prevented installed cargo-audit application path canonicalization; stdout empty, no audit verdict. Re-run with authorized normal filesystem access, using previously refreshed advisory database."
+}

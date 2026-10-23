@@ -1,0 +1,43 @@
+{
+  "answer": "La durée de TTL corrigée n’est pas disponible dans les données fournies. La stratégie à appliquer au replay cache est également inconnue.",
+  "threadId": "01a1671c-ca87-7ec2-9b90-76d1e007fd56",
+  "usage": {
+    "input_tokens": 20516,
+    "cached_input_tokens": 16384,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 62,
+    "reasoning_output_tokens": 28
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a1671c-ca87-7ec2-9b90-76d1e007fd56\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"La durée de TTL corrigée n’est pas disponible dans les données fournies. La stratégie à appliquer au replay cache est également inconnue.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20516,\"cached_input_tokens\":16384,\"cache_write_input_tokens\":0,\"output_tokens\":62,\"reasoning_output_tokens\":28}}\n",
+  "stderr": "2026-10-23T04:55:02.557625Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q17",
+  "arm": "without",
+  "startedAt": "2026-10-23T04:55:01.932533+00:00",
+  "completedAt": "2026-10-23T04:55:11.100287+00:00",
+  "elapsedMs": 9167.675,
+  "promptSha256": "039f2fc6c930b455f297ad1447f228b182241b15999158c29f7817b2bd852c65",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

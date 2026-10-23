@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "memory-final-document-binding-check/v2",
+  "status": "passed",
+  "stagedEvidenceFilesByteExact": 260,
+  "changedMarkdownFiles": [
+    "docs/plans/memory-recall-quality-fixes.md",
+    "plugins/memory/evidence/ci-integration-2026-10-23/README.md",
+    "plugins/memory/evidence/ci-integration-2026-10-23/errors.md",
+    "plugins/memory/evidence/ci-integration-2026-10-23/recorder-original/README.md",
+    "plugins/memory/evidence/ci-integration-2026-10-23/recorder-public/README.md",
+    "plugins/memory/evidence/ci-integration-2026-10-23/results.md"
+  ],
+  "relativeLinkPathsChecked": 303,
+  "brokenRelativeLinkPaths": [],
+  "anchorAndRemoteScope": "Local file existence; separate repo documentation validator and inspected PR metadata retain their own scope.",
+  "publicProofFilesVerified": 198,
+  "publicReceiptAttachmentsVerified": 16,
+  "privateOriginalProofFilesVerified": 195,
+  "privateOriginalReceiptInputsVerified": 16,
+  "metadataDerivativeExactlyReproduced": true,
+  "allModelOutputJsonUnchanged": true,
+  "verbatimReportAnswers": 84,
+  "preparationIssue": "First inline document comparator read UTF-8 JSON using Windows cp1252 and falsely reported differing answers. Explicit UTF-8 reproduces all84 answers; actual files were unchanged."
+}

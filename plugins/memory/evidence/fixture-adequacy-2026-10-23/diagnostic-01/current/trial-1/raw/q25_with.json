@@ -1,0 +1,43 @@
+{
+  "answer": "Les informations fournies mentionnent une région et un tag de rollback pour Vesper-West, mais ne documentent aucune approbation actuelle. Leur statut d’approbation est inconnu.",
+  "threadId": "01a1682e-7b4d-77a0-966f-2e33dff69241",
+  "usage": {
+    "input_tokens": 26530,
+    "cached_input_tokens": 21504,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 351,
+    "reasoning_output_tokens": 307
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a1682e-7b4d-77a0-966f-2e33dff69241\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Les informations fournies mentionnent une région et un tag de rollback pour Vesper-West, mais ne documentent aucune approbation actuelle. Leur statut d’approbation est inconnu.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26530,\"cached_input_tokens\":21504,\"cache_write_input_tokens\":0,\"output_tokens\":351,\"reasoning_output_tokens\":307}}\n",
+  "stderr": "2026-10-23T09:53:59.133539Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q25",
+  "arm": "with",
+  "startedAt": "2026-10-23T09:53:58.723636+00:00",
+  "completedAt": "2026-10-23T09:54:16.592290+00:00",
+  "elapsedMs": 17868.862,
+  "promptSha256": "c63f3849778b8d94cdcc84dfac416d001ee01211935b0b9a4de9eda3df3674ad",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}
