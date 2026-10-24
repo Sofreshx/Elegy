@@ -1,0 +1,147 @@
+{
+  "kind": "local-shared-agent-validation",
+  "version": 1,
+  "baseCommit": "cdaaaccc462c986f4a2c0032b75698f15c71f62b",
+  "branch": "codex/memory-shared-authors-20261024",
+  "dataScope": "Fictional fixtures only during implementation; no real database activation, migration, key or cloud runtime",
+  "sourceSha256Lf": {
+    "hosts/memory-mcp/src/memory_tools.rs": "a6f20d5d12f0a4e6fb3cd56581ac48261a5890111f1673f2276496cb28fb02c6",
+    "hosts/memory-mcp/src/stdio_main.rs": "b5b96012764a8554369ecf85a56f1d8cc8e72384a2bfb43e4bbf5a174706e2e8",
+    "hosts/memory-mcp/src/memory_tools/shared_access_tests.rs": "44a822cf3c4ab78e66d59ce6dd9a647b1483d8c8a41230a5236b08af38b65cae",
+    "hosts/memory-mcp/tests/shared_agents_stdio.rs": "a3cefabfd9bb5628df9071d950815b0726965e6bead84f4625d0b39427b0cbe5",
+    "plugins/memory/src/storage/recall_store.rs": "8add40d5ff4639b2bd1940981bdcc2e8ab1aa3013a0bf592f8adb68feed5c945",
+    "plugins/memory/src/storage/sqlite_store.rs": "52966157154aaa8fae93ae3fadb8853336433c2f86412a5005827676057a352c"
+  },
+  "runs": [
+    {
+      "check": "memory",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "elegy-memory"
+      ],
+      "exitCode": 0,
+      "logSha256": "31d511f6007309e300a403996d2e4c6e12082ba04d10d6a25bf5cd3ffb011ec4",
+      "passed": 408,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "check": "mcp",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "elegy-memory-mcp"
+      ],
+      "exitCode": 0,
+      "logSha256": "2e0f4d8e33bb18c85933e598ed27b29e440b1d0809fbba6e277e2ba09a6901ea",
+      "passed": 88,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "check": "stdioHelpersFinal",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "elegy-memory-mcp",
+        "--test",
+        "shared_agents_stdio"
+      ],
+      "exitCode": 0,
+      "logSha256": "033076e42351ab09ecbacae07f9c122ff4e841c97d4f62335b4a86a1fcc440c9",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "check": "format",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "check": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "elegy-memory",
+        "-p",
+        "elegy-memory-mcp",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exitCode": 0,
+      "logSha256": "3a6ccb2d6fcdfcb0ed517e179f99bcdab9a8811e0c103cd502c02015a17ae45d"
+    },
+    {
+      "check": "contracts",
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "elegy-core",
+        "--bin",
+        "elegy-contracts",
+        "--",
+        "--project",
+        ".",
+        "contracts",
+        "validate"
+      ],
+      "exitCode": 0,
+      "logSha256": "ef1f24c79dec6d212349a77dbf903e016b2a58b141d2d4317287092e5ece9167"
+    }
+  ],
+  "redEvidence": [
+    {
+      "kind": "missingFeatureApiCompilation",
+      "exitCode": 101,
+      "diagnostic": "with_shared_agents missing (E0599)"
+    },
+    {
+      "kind": "vectorPoolStarvationRuntime",
+      "exitCode": 101,
+      "observed": "0 authorized results, expected 1, with 1001 closer private neighbors"
+    },
+    {
+      "kind": "searchPageEffectsRuntime",
+      "exitCode": 101,
+      "observed": "non-returned authorized row touched once, expected 0"
+    }
+  ],
+  "review": "Final targeted static review approved; runtime checks executed in separate validation lane",
+  "documentation": {
+    "check": "PASS",
+    "exitCode": 0,
+    "bundleRegenerated": true,
+    "remainingWarning": "DOCS-CHECK-009: unchanged observation roadmap freshness",
+    "logSha256": "1f167b0765187fa1d0bab698c3a6dd7185166fe447ffafc766f0385686248195"
+  },
+  "limits": [
+    "One fixed actor per host binding; upstream identities are not automatically authenticated",
+    "Content/lifecycle mutations remain owner-only; search metadata affects returned authorized rows",
+    "Consolidation lifecycle/link mutations have no separate actor audit journal",
+    "Filtered vectors use SQL-authorized scan; latency not qualified",
+    "Opt-in large-corpus benchmark and Unix-only signal behavior not qualified on this Windows run",
+    "Full MCP suite preceded style-only test-helper lint corrections; changed stdio test target rerun successfully",
+    "No installation, real-data sharing, readiness promotion or cloud connection demonstrated"
+  ]
+}

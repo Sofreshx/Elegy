@@ -30,6 +30,41 @@ The `hosts/memory-mcp/` crate already implements:
 
 ## Productionization Scope
 
+### Explicit shared-agent reads (opt-in)
+
+The stdio host may name a shared space and an explicit JSON array of agent IDs.
+The configured caller must occur in that array; empty, duplicate or blank IDs
+are invalid. Without this configuration, existing read bindings stay private.
+This is a local trusted-host configuration, not caller-supplied authorization.
+Each distinct actor requires its own stdio host binding. One cloud plugin bound
+to one process identifies that process's actor, not every upstream human/agent.
+
+The database is the data boundary. The space name is a display label, not an
+additional row partition. Only agent-scoped rows owned by listed agents, with
+no tenant or user binding, become shared. The current actor retains its prior
+access to its own bound rows. Unlisted owners, foreign user/tenant-bound
+rows and other owners' wider scopes remain inaccessible. Search authorization
+must precede access tracking, promotion, result truncation and score logging.
+
+Content and explicit lifecycle mutations remain restricted to the current actor's agent-scoped rows. This
+includes indirect merge, correction and consolidation targets. Creation and
+responses retain the original `agentId`; version/correction records identify
+the acting agent. A shared reader cannot delete or rewrite another author's
+contribution. Permanent deletion remains an explicit host/user decision; tool
+availability alone does not authorize deleting real data.
+Consolidation preserves row authorship; lifecycle transitions and links do not
+yet have a separate actor-attributed audit journal. This slice does not claim
+complete per-operation audit coverage.
+Search may update retrieval metadata for authorized shared rows; it never
+reattributes their authorship. This is distinct from content mutation rights.
+
+Acceptance uses fictional databases only: two allowed actors can read each
+other while retaining attribution; an excluded actor, wider scope and
+foreign tenant/user bindings remain hidden; search cannot touch hidden rows; direct
+and indirect cross-author mutations fail or remain confined to owned rows;
+invalid configuration fails closed; default behavior remains private. No
+migration, real-data activation or readiness promotion follows from these tests.
+
 ### 1. Shared runtime contract
 
 Both CLI (`elegy-memory`) and MCP (`elegy-memory-mcp-*`) share the same `elegy-memory` library crate as dependency. They must also share:

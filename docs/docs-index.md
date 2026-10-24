@@ -371,6 +371,16 @@
       "title": "Memory recall quality corrections"
     },
     {
+      "authorityClass": "planning",
+      "docKind": "planning",
+      "freshness": "unknown",
+      "path": "docs/plans/memory-shared-authors-20261024.md",
+      "sourceOfTruth": "planning-non-canon",
+      "status": "active",
+      "summary": "Goal: prepare opt-in shared agent reads on the existing database without",
+      "title": "Shared Memory with distinct authors"
+    },
+    {
       "authorityClass": "other",
       "docKind": "generated",
       "freshness": "unknown",
@@ -605,6 +615,7 @@
     "docs/plans/automation-portability-handoff.md",
     "docs/plans/memory-qualification.md",
     "docs/plans/memory-recall-quality-fixes.md",
+    "docs/plans/memory-shared-authors-20261024.md",
     "docs/roadmaps/observation-substrate-roadmap.md",
     "docs/research/historical-monetization-infrastructure.md",
     "docs/research/openclaw-orchestration-gap-roadmap.md",

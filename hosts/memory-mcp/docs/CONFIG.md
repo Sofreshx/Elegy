@@ -42,7 +42,9 @@ store, or signing-key setting.
 | Variable | Requirement |
 |---|---|
 | `ELEGY_DB_PATH` | Required SQLite path. |
-| `ELEGY_MCP_AGENT_ID` | Optional fixed agent identity. |
+| `ELEGY_MCP_AGENT_ID` | Fixed agent identity; explicit value required when shared reads are enabled. |
+| `ELEGY_MCP_SHARED_SPACE` | Opt-in shared-space label; must be paired with `ELEGY_MCP_SHARED_AGENTS`. Labels do not partition database rows. |
+| `ELEGY_MCP_SHARED_AGENTS` | JSON array of distinct, nonblank agent IDs explicitly allowed to share reads. Must include this host's fixed `ELEGY_MCP_AGENT_ID`. Unset means no cross-agent sharing. |
 | `ELEGY_MCP_READ_SCOPE` | Optional readable scope range; defaults to `session` and accepts `session`, `workspace`, `user`, or `agent`. Writes remain agent-scoped. |
 | `OLLAMA_URL` | Optional; defaults to local Ollama. |
 | `ELEGY_EMBEDDING_MODEL` | Optional model name. |
@@ -51,9 +53,47 @@ store, or signing-key setting.
 | `ELEGY_EMBEDDING_BREAKER_THRESHOLD` | Optional; consecutive embedding-provider failures before the circuit opens and short-circuits further calls instead of paying a full timeout each time. Defaults to 5; `0` disables the breaker. Shared with the CLI. |
 | `ELEGY_EMBEDDING_BREAKER_COOLDOWN_SECONDS` | Optional; how long the circuit stays open before a single trial call is allowed through. Defaults to 30. Shared with the CLI. |
 
-Stdio never reads the HTTP authentication variables. Its read binding also
-includes memories without an `agent_id`; writes remain limited to the
-configured agent scope.
+Stdio never reads the HTTP authentication variables. Without shared-agent
+configuration its read binding also includes memories without an `agent_id`.
+Writes require the configured agent's own agent-scoped row.
+
+### Shared agents, distinct authors
+
+Configure each authorized actor's process with its own `ELEGY_MCP_AGENT_ID`,
+the same explicit database path, shared-space label and JSON owner allowlist.
+Both shared variables must be present together. Invalid configuration stops
+before the database opens. The caller must belong to the list. Only listed
+agent-scoped rows without tenant/user bindings become shared. The current
+actor retains access to its own bound rows; unowned rows
+are excluded in this mode. Other owners' wider scopes remain private.
+
+The database path and owner allowlist define the boundary: the space label is
+not a per-row project filter. Only enable a database whose listed owners'
+agent-scoped contributions are intended for the shared audience. No existing
+row is migrated or reattributed. `agentId` in recall/list/search/store results
+identifies the original author. Updates/corrections record the acting agent.
+Direct mutations, correction merges and consolidation remain owner-only.
+Consolidation keeps original authors; its lifecycle transitions and links do
+not yet have a separate actor-attributed audit journal.
+Search can still update authorized rows' retrieval metadata and promotion.
+Owner/access-filtered vector searches scan authorized vectors before selecting
+results, so private neighbors cannot exhaust a global KNN candidate pool.
+Vector scoring scales with the authorized corpus; SQL filtering also depends
+on database size and indexes. This does not establish a latency guarantee.
+
+The [fictional configuration](shared-agent-config.example.json) illustrates
+two local hosts with distinct actors and all nine existing tools. One shared
+cloud plugin bound to one host still has one fixed actor. Distinct upstream
+agents require distinct authenticated host bindings; tool arguments cannot
+override the actor. These settings do not authenticate upstream callers,
+grant OpenAI permissions, install a service or activate the tunnel.
+
+Before real activation, use SQLite's online backup API and verify restoration
+on a separate path with the installed Memory binary. Keep the original data
+and previous host configuration for rollback. Stopping the tunnel and revoking
+its dedicated key/connection withdraws cloud access without deleting the DB.
+`memory_delete` is permanent: exposing the tool does not authorize deleting
+real contributions. Keep test fixtures separate from the real database.
 
 ### Embedding boot policy
 

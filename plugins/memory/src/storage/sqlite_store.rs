@@ -104,6 +104,7 @@ pub struct SqliteMemoryStore {
     connection: Arc<Mutex<Connection>>,
     scope: MemoryScope,
     embedding_provider: Option<Arc<dyn EmbeddingProvider>>,
+    gate_agent_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -427,6 +428,115 @@ impl SqliteMemoryStore {
             connection: Arc::new(Mutex::new(connection)),
             scope,
             embedding_provider,
+            gate_agent_id: None,
+        })
+    }
+
+    /// Restrict novelty/correction candidate selection to an agent's own rows.
+    /// This shares the connection but is NOT an authorization wrapper for all
+    /// storage methods; the host still checks each read and mutation boundary.
+    pub fn gate_view_for_agent(&self, agent_id: &str) -> Self {
+        let mut view = self.clone();
+        view.gate_agent_id = Some(agent_id.to_string());
+        view
+    }
+
+    /// Search an explicitly configured shared agent space. Authorization is
+    /// applied in SQL before ranking, logging, truncation and retrieval effects.
+    /// This does not authenticate the caller; the host owns the fixed binding.
+    pub async fn search_shared_agents(
+        &self,
+        query: SearchQuery,
+        caller: &str,
+        shared: &[String],
+    ) -> Result<Vec<ScoredMemory>, StoreError> {
+        if caller.trim().is_empty() || !shared.iter().any(|id| id == caller) {
+            return Err(StoreError::Validation(
+                "invalid shared agent binding".to_string(),
+            ));
+        }
+        let access =
+            recall_store::RecallAccess::for_agents(query.scope.visible_scopes(), caller, shared);
+        self.search_with_access(query, Some(&access)).await
+    }
+
+    async fn search_with_access(
+        &self,
+        query: SearchQuery,
+        access: Option<&recall_store::RecallAccess<'_>>,
+    ) -> Result<Vec<ScoredMemory>, StoreError> {
+        let trimmed_text = query.text.trim().to_string();
+        if query.max_results == 0 {
+            return Ok(Vec::new());
+        }
+        if trimmed_text.is_empty() && query.embedding.is_none() {
+            return Err(StoreError::Validation(
+                "search requires non-empty text or a query embedding".to_string(),
+            ));
+        }
+
+        let requested_state = query.state_filter.unwrap_or(MemoryState::Active);
+        if requested_state == MemoryState::Deleted {
+            return Ok(Vec::new());
+        }
+
+        let derived_query_embedding = if query.embedding.is_none() {
+            self.generate_embedding(&trimmed_text, EmbeddingTask::Query)
+                .await
+                .unwrap_or_default()
+        } else {
+            None
+        };
+        let scoring_mode = RetrievalScoringMode::from_env();
+        let explain_retrieval_scoring = explain_retrieval_scoring_enabled();
+
+        self.with_connection(|connection| {
+            let scope_config = load_scope_config(connection)?;
+            let ranked_candidates = match access {
+                Some(access) => rank_search_candidates_with_access(
+                    connection,
+                    &query,
+                    &trimmed_text,
+                    derived_query_embedding.as_deref(),
+                    scoring_mode,
+                    Some(access),
+                    None,
+                )?,
+                None => rank_search_candidates(
+                    connection,
+                    &query,
+                    &trimmed_text,
+                    derived_query_embedding.as_deref(),
+                    scoring_mode,
+                )?,
+            };
+            if explain_retrieval_scoring {
+                emit_search_score_explanations(
+                    &trimmed_text,
+                    scoring_mode,
+                    &ranked_candidates,
+                    query.max_results,
+                );
+            }
+
+            let mut results = ranked_candidates
+                .into_iter()
+                .map(|(scored_memory, _)| scored_memory)
+                .collect::<Vec<_>>();
+            results.truncate(query.max_results);
+            let mut results = trim_results_to_context_budget(
+                results,
+                query.context_config.as_ref(),
+                &scope_config,
+            );
+            touch_scored_memories(connection, &mut results)?;
+            auto_promote_scored_memories(
+                connection,
+                &mut results,
+                query.session_id.as_deref(),
+                &scope_config,
+            )?;
+            Ok(results)
         })
     }
 
@@ -1560,6 +1670,36 @@ impl SqliteMemoryStore {
         corrected_by: &str,
         reason: Option<&str>,
     ) -> Result<CorrectionRecord, StoreError> {
+        self.correct_memory_impl(id, corrected_content, corrected_by, reason, None)
+    }
+
+    /// Apply a correction without merging into or linking to another author's
+    /// contribution. Used by fixed-actor MCP bindings; legacy CLI is unchanged.
+    pub fn correct_memory_for_agent(
+        &self,
+        id: &MemoryId,
+        corrected_content: &str,
+        corrected_by: &str,
+        reason: Option<&str>,
+        agent_id: &str,
+    ) -> Result<CorrectionRecord, StoreError> {
+        self.gate_view_for_agent(agent_id).correct_memory_impl(
+            id,
+            corrected_content,
+            corrected_by,
+            reason,
+            Some(agent_id),
+        )
+    }
+
+    fn correct_memory_impl(
+        &self,
+        id: &MemoryId,
+        corrected_content: &str,
+        corrected_by: &str,
+        reason: Option<&str>,
+        agent_id: Option<&str>,
+    ) -> Result<CorrectionRecord, StoreError> {
         let trimmed_content = corrected_content.trim();
         if trimmed_content.is_empty() {
             return Err(StoreError::Validation(
@@ -1576,19 +1716,48 @@ impl SqliteMemoryStore {
         let existing_memory = self.with_connection(|connection| {
             require_memory(connection, id)?.ok_or(StoreError::NotFound(*id))
         })?;
+        if agent_id.is_some_and(|actor| !agent_owns_writable_memory(&existing_memory, actor)) {
+            return Err(StoreError::NotFound(*id));
+        }
         if existing_memory.content.trim() == trimmed_content {
             return Err(StoreError::Validation(
                 "corrected content must differ from the current memory content".to_string(),
             ));
         }
 
-        let decision = self.evaluate_correction_decision(id, &existing_memory, trimmed_content)?;
+        let mut decision =
+            self.evaluate_correction_decision(id, &existing_memory, trimmed_content)?;
+        if let Some(actor) = agent_id {
+            let reference = match &decision {
+                GateDecision::Merge { target_id, .. } => Some(*target_id),
+                GateDecision::Contradiction { conflicting_id, .. } => Some(*conflicting_id),
+                GateDecision::Accept { similar_to, .. } => *similar_to,
+                _ => None,
+            };
+            if let Some(reference) = reference {
+                let owned = self.with_connection(|connection| {
+                    Ok(require_memory(connection, &reference)?
+                        .is_some_and(|m| agent_owns_writable_memory(&m, actor)))
+                })?;
+                if !owned {
+                    // Foreign candidates neither authorize a mutation nor leak a
+                    // relationship. The actor's correction remains independent.
+                    decision = GateDecision::Accept {
+                        similar_to: None,
+                        similarity: None,
+                    };
+                }
+            }
+        }
         let reason_text = reason.unwrap_or("").trim().to_string();
         let mut embeddings_to_refresh = vec![(*id, trimmed_content.to_string())];
 
         let (correction, target_embedding_refresh) = self.with_connection(|connection| {
             let transaction = connection.transaction()?;
             let mut memory = require_memory(&transaction, id)?.ok_or(StoreError::NotFound(*id))?;
+            if agent_id.is_some_and(|actor| !agent_owns_writable_memory(&memory, actor)) {
+                return Err(StoreError::NotFound(*id));
+            }
             let previous_content = memory.content.clone();
             let previous_memory = memory.clone();
             let row_id = require_memory_rowid(&transaction, id)?;
@@ -2282,68 +2451,7 @@ impl MemoryStore for SqliteMemoryStore {
     }
 
     async fn search(&self, query: SearchQuery) -> Result<Vec<ScoredMemory>, StoreError> {
-        let trimmed_text = query.text.trim().to_string();
-        if query.max_results == 0 {
-            return Ok(Vec::new());
-        }
-        if trimmed_text.is_empty() && query.embedding.is_none() {
-            return Err(StoreError::Validation(
-                "search requires non-empty text or a query embedding".to_string(),
-            ));
-        }
-
-        let requested_state = query.state_filter.unwrap_or(MemoryState::Active);
-        if requested_state == MemoryState::Deleted {
-            return Ok(Vec::new());
-        }
-
-        let derived_query_embedding = if query.embedding.is_none() {
-            self.generate_embedding(&trimmed_text, EmbeddingTask::Query)
-                .await
-                .unwrap_or_default()
-        } else {
-            None
-        };
-        let scoring_mode = RetrievalScoringMode::from_env();
-        let explain_retrieval_scoring = explain_retrieval_scoring_enabled();
-
-        self.with_connection(|connection| {
-            let scope_config = load_scope_config(connection)?;
-            let ranked_candidates = rank_search_candidates(
-                connection,
-                &query,
-                &trimmed_text,
-                derived_query_embedding.as_deref(),
-                scoring_mode,
-            )?;
-            if explain_retrieval_scoring {
-                emit_search_score_explanations(
-                    &trimmed_text,
-                    scoring_mode,
-                    &ranked_candidates,
-                    query.max_results,
-                );
-            }
-
-            let mut results = ranked_candidates
-                .into_iter()
-                .map(|(scored_memory, _)| scored_memory)
-                .collect::<Vec<_>>();
-            results.truncate(query.max_results);
-            let mut results = trim_results_to_context_budget(
-                results,
-                query.context_config.as_ref(),
-                &scope_config,
-            );
-            touch_scored_memories(connection, &mut results)?;
-            auto_promote_scored_memories(
-                connection,
-                &mut results,
-                query.session_id.as_deref(),
-                &scope_config,
-            )?;
-            Ok(results)
-        })
+        self.search_with_access(query, None).await
     }
 
     async fn find_similar(
@@ -2367,7 +2475,7 @@ impl MemoryStore for SqliteMemoryStore {
                 visible_scopes,
                 MemoryState::Active,
                 None,
-                None,
+                self.gate_agent_id.as_deref(),
                 embedding,
                 threshold,
                 limit,
@@ -2382,7 +2490,7 @@ impl MemoryStore for SqliteMemoryStore {
                 visible_scopes,
                 MemoryState::Active,
                 None,
-                None,
+                self.gate_agent_id.as_deref(),
                 None,
                 Some(&candidate_ids),
             )?
@@ -4920,7 +5028,12 @@ fn load_vector_similarity_scores_with_access(
         }
     }
 
-    if vec_memories_uses_native_module(connection)? {
+    // vec0's k constraint applies before predicates on joined memory rows.
+    // Authorized rows must not compete with hidden rows for that global pool.
+    // Reuse the SQL-filtered scan for access/owner-bound searches and gates;
+    // unfiltered callers retain the native KNN path.
+    if access.is_none() && agent_id_filter.is_none() && vec_memories_uses_native_module(connection)?
+    {
         load_vector_similarity_scores_via_knn(
             connection,
             scopes,
@@ -6347,6 +6460,12 @@ fn exact_correction_duplicate_decision(
         Ok(visible
             .into_iter()
             .filter(|memory| memory.id != *excluded_id)
+            .filter(|memory| {
+                store
+                    .gate_agent_id
+                    .as_deref()
+                    .is_none_or(|actor| agent_owns_writable_memory(memory, actor))
+            })
             .filter(|memory| normalize_shared_import_content(&memory.content) == normalized)
             .max_by_key(|memory| memory.scope.rank()))
     })?;
@@ -6784,3 +6903,7 @@ fn export_to_sqlite_file(
 
 #[cfg(test)]
 mod tests;
+
+fn agent_owns_writable_memory(memory: &Memory, actor: &str) -> bool {
+    memory.scope == MemoryScope::Agent && memory.agent_id.as_deref() == Some(actor)
+}
