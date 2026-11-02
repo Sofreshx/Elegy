@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "elegy.cli/v1",
+  "correlationId": "elegy-memory-25484-1792723980018749400",
+  "command": [
+    "eval.next"
+  ],
+  "status": "ok",
+  "data": {
+    "buildMatchesSource": false,
+    "next": null,
+    "nextAction": "Rebuild Memory from this checkout, then rerun eval next with the newly built executable.",
+    "nextInvocation": {
+      "args": [
+        "build",
+        "--manifest-path",
+        "\\\\?\\<project>\\Cargo.toml",
+        "-p",
+        "elegy-memory"
+      ],
+      "program": "cargo"
+    },
+    "rebuildRequired": true,
+    "schemaVersion": "memory-qualification/v1"
+  }
+}

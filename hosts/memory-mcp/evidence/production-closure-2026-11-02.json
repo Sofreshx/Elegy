@@ -1,0 +1,145 @@
+{
+  "schemaVersion": "memory-production-integration-evidence/v1",
+  "recordedAt": "2026-11-02",
+  "sourceBaseCommit": "48df62ff9c5842e02097f6ea951faa7543ce71ae",
+  "scope": "Local source integration, synthetic fixtures and library measurement. No real database, credential, persistent configuration, tunnel or cloud tool call.",
+  "sourceSha256Lf": {
+    "hosts/host-mcp/src/host.rs": "dc1776cf02fa3dbaa58e498300ee963719c00bbc6a4a1c7e2a3c7f003832687b",
+    "hosts/host-mcp/src/preflight.rs": "aaa5c0296d6437436a9c625c236ef6bd194006ebb9064b08dbe47d5874380c38",
+    "hosts/memory-mcp/src/memory_tools.rs": "05ea2519290ea954b28a5cb31585ea1be300a243a4c75131c34177c18062e7a6",
+    "hosts/memory-mcp/src/stdio_main.rs": "b5b96012764a8554369ecf85a56f1d8cc8e72384a2bfb43e4bbf5a174706e2e8",
+    "plugins/memory/src/storage/recall_store.rs": "5c778546f834895a1a4946f3dc601129ac670585532ea5490a263261e3198dc4",
+    "plugins/memory/src/storage/sqlite_store.rs": "9f65864a97175803edb19fc45e8d69b1127e173db498cf6fd7ade6d3a229e202",
+    "scripts/install-shared-memory.py": "476ebd4c351bc5c1ea2b6123bcfae18245612f161bc657d9f83f60cc261b4962",
+    "scripts/start-private-memory-tunnel.ps1": "ae623c679aff2048901aea3ba0a25ba585e6d57f9e4cad5f6e181a03c95adf0b",
+    "scripts/mcp-install-receipt.sh": "aacdcaac30bc11393c36fc8c414ce0ee14afb2feb01e1404ce1f086a9082eecb",
+    "scripts/tests/test_install_shared_memory.py": "2dccdc905b1edbf9861251d2c02e7db5ec91732a91eff49c2b8db61b72378d09",
+    "scripts/tests/test_private_memory_tunnel.ps1": "6425b24e0b06ca0c126c1d91370ef9484e09af63764e0739d803ef2c9b41dc51",
+    "scripts/tests/test_mcp_install_receipt.py": "cc3986edb5db35e3b7de977d7b272aa9250a6f916b673c6f71ca03db7925b9d2",
+    "plugins/memory/tests/recall_performance.rs": "7c75b9af91ddb0baefee39215c1839b7ad0104de1dc134e3256387e90a4b4ab7"
+  },
+  "retainedValidation": {
+    "sourceReceipt": "shared-agents-2026-10-24.json",
+    "memoryPassed": 408,
+    "memoryMcpPassed": 88,
+    "reuseReason": "Baseline evidence for source commit48df62f; current private-search fix has separate RED/GREEN proof and requires a new full suite."
+  },
+  "freshValidation": {
+    "descriptorAndHostTests": {
+      "passed": 18,
+      "exitCode": 0
+    },
+    "repoPreflight": {
+      "resourceCount": 4,
+      "exitCode": 0
+    },
+    "installedBinaryReceiptFixtures": {
+      "passed": 5,
+      "exitCode": 0,
+      "redEvidence": "Before the fix, altered/missing installed binaries and mismatched write were incorrectly accepted: 3 expected assertion failures."
+    },
+    "installerFixtures": {
+      "passed": 20,
+      "skipped": 1,
+      "skipReason": "Real Windows junction creation denied in restricted environment; separate junction-detection test passed.",
+      "redEvidence": "Interrupted apply initially prevented retry; original-binding interruption and leaked SQLite handles also reproduced before fixes."
+    },
+    "windowsProcessFixtures": {
+      "passed": 7,
+      "networkUsed": false,
+      "credential": "fictional only"
+    },
+    "recallFeedbackAndJournalProofs": {
+      "passed": 3
+    },
+    "validRequestFailingHookChild": {
+      "passed": 1
+    },
+    "formatting": {
+      "exitCode": 0
+    },
+    "legacyPrivateSearch": {
+      "passed": 2,
+      "redFailures": 2,
+      "hiddenVectors": 1001,
+      "nonReturnedCountersUnchanged": true
+    },
+    "securityWorkflow": {
+      "officialGitleaksVersion": "8.30.1",
+      "allHistoryExitCode": 0,
+      "allHistoryFindings": 0,
+      "sourceSnapshotFiles": 2082,
+      "sourceSnapshotFindings": 13,
+      "sourceSnapshotUnreviewedFindings": 0,
+      "reviewedExactFingerprintsOnly": true
+    }
+  },
+  "recallBenchmark": {
+    "benchmark": "contextual-recall-library-synthetic-v1",
+    "corpus": {
+      "authorizedExpected": 1,
+      "embedding": "none",
+      "forbiddenExactMatches": 4,
+      "lexicalDistractors": 1000,
+      "minSimilarity": 0.800000011920929,
+      "rows": 1005
+    },
+    "environment": {
+      "arch": "x86_64",
+      "availableParallelism": 8,
+      "debugAssertions": false,
+      "os": "windows",
+      "sqliteVersion": "3.46.0"
+    },
+    "journal": {
+      "events": 105,
+      "expectedItems": 105,
+      "sessions": 105
+    },
+    "latencyIsMeasurementOnly": true,
+    "latencyMs": {
+      "max": 358.1786,
+      "p50": 243.18449999999999,
+      "p95": 306.7572
+    },
+    "limits": "single local warm lexical workload; no provider, embedding, host-hook, concurrent writer, or production database measurement",
+    "p95TargetMet": true,
+    "p95TargetMs": 500.0,
+    "path": "in-process lexical recall; includes source open, ranking, and journal commit",
+    "sampling": {
+      "freshSessionPerCall": true,
+      "measuredCalls": 100,
+      "percentileMethod": "nearest-rank",
+      "setupAndAssertionsTimed": false,
+      "sharedJournal": true,
+      "warmupCalls": 5
+    },
+    "source": {
+      "bytesUnchanged": true,
+      "countersUnchanged": true,
+      "databaseBytes": 770048,
+      "sha256": "a3b6173391b813720f62c763b6fdcd2a75dce26fd3a225035cf0a885178fea0c",
+      "walBytes": 0,
+      "walUnchanged": true
+    }
+  },
+  "limits": [
+    "Lexical in-process measurement on one Windows x64 environment, not embeddings, process startup, host hook, concurrency or model answer latency.",
+    "Original adverse answer-quality and second-host evidence remains historical; corrected retrieval does not guarantee model grounding.",
+    "No clean non-fixture cross-host task or readiness promotion is claimed.",
+    "No real activation or deletion was performed."
+  ],
+  "localLogSha256": {
+    "host-tests.log": "3bd6fbcb70cd00a375faf26241eebd2b53be6bfb27972219b96bd46835c9a577",
+    "host-preflight.log": "c092882d73c5ef1b97d04a31d361f729eab57aee9d7e3f02d807d84c8c26b245",
+    "receipt-green.log": "a42e5939b8d1b891d711da106755612eb063880fc922661565cfca7181901403",
+    "recall-proof-cases.log": "fc254266f0d393861fa23f53e69d49986dcf2cb109f86e6b5d6d59124d8b1f18",
+    "recall-hook-child-failure.log": "bc14cadb1f669bbbe94932136b1a93e4e247fbacca7631b02705e46a24b95e8f",
+    "recall-library-benchmark.log": "466f44d4ee03364d6f28bfe85efdaf7e10e7ccde3a6a6e15a1f95b945d70e2dd"
+  },
+  "checkpointState": "Integration checkpoint, not final acceptance: review fixes and focused regressions passed; full-suite validation remains pending.",
+  "recallBenchmarkMeasuredSourceSha256Lf": {
+    "plugins/memory/src/storage/recall_store.rs": "8add40d5ff4639b2bd1940981bdcc2e8ab1aa3013a0bf592f8adb68feed5c945",
+    "plugins/memory/src/storage/sqlite_store.rs": "52966157154aaa8fae93ae3fadb8853336433c2f86412a5005827676057a352c"
+  }
+}

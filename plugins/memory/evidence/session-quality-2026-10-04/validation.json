@@ -1,0 +1,235 @@
+{
+  "schemaVersion": "memory-evidence-validation/v1",
+  "createdAt": "2026-10-04T19:06:05.078821+00:00",
+  "checks": [
+    {
+      "name": "focused-regressions",
+      "exitCode": 0,
+      "actualOutput": "test_absent_or_empty_administrative_sidecars_accept (test_packet_audit.SubstantiveSnapshotTests.test_absent_or_empty_administrative_sidecars_accept) ... ok\ntest_flat_changed_main_and_nonempty_wal_rejects (test_packet_audit.SubstantiveSnapshotTests.test_flat_changed_main_and_nonempty_wal_rejects) ... ok\ntest_flat_unchanged_main_with_nonempty_wal_rejects (test_packet_audit.SubstantiveSnapshotTests.test_flat_unchanged_main_with_nonempty_wal_rejects) ... ok\ntest_missing_snapshots_reject (test_packet_audit.SubstantiveSnapshotTests.test_missing_snapshots_reject) ... ok\ntest_nested_main_or_wal_change_rejects (test_packet_audit.SubstantiveSnapshotTests.test_nested_main_or_wal_change_rejects) ... ok\ntest_recorded_durable_data_shape_rejects_main_or_wal_change (test_packet_audit.SubstantiveSnapshotTests.test_recorded_durable_data_shape_rejects_main_or_wal_change) ... ok\ntest_absent_to_empty_wal_and_new_shm_passes (test_probe.SourceInvariantTests.test_absent_to_empty_wal_and_new_shm_passes) ... ok\ntest_changed_main_database_fails (test_probe.SourceInvariantTests.test_changed_main_database_fails) ... ok\ntest_nonempty_changed_wal_fails (test_probe.SourceInvariantTests.test_nonempty_changed_wal_fails) ... ok\n\n----------------------------------------------------------------------\nRan 9 tests in 0.063s\n\nOK\n",
+      "sourceHashes": {
+        "test_packet_audit.py": "fd255f06ee71436df223351fe15d4661117f2aa308936d4b9d3e3f8d493fbf40",
+        "test_probe.py": "c2dc5214937f9907def8361a1964096b3253938700d0fa0cf62e74b80d38a213"
+      }
+    },
+    {
+      "name": "python-compile",
+      "passed": true,
+      "scripts": 10
+    },
+    {
+      "name": "report-local-links",
+      "passed": true,
+      "links": [
+        {
+          "target": "host-run-03/run.json",
+          "exists": true
+        },
+        {
+          "target": "host-run-02/session-03.json",
+          "exists": true
+        },
+        {
+          "target": "timed-assessment.json",
+          "exists": true
+        },
+        {
+          "target": "source-run-02/run.json",
+          "exists": true
+        },
+        {
+          "target": "installed-run-02/run.json",
+          "exists": true
+        },
+        {
+          "target": "packet-audit.json",
+          "exists": true
+        },
+        {
+          "target": "observations/host-run-03-cross-session.json",
+          "exists": true
+        },
+        {
+          "target": "ledger.json",
+          "exists": true
+        },
+        {
+          "target": "../../../../AGENTS.md",
+          "exists": true
+        },
+        {
+          "target": "../../../../docs/architecture/README.md",
+          "exists": true
+        },
+        {
+          "target": "../../../../docs/specs/memory-contextual-recall-v1/spec.md",
+          "exists": true
+        },
+        {
+          "target": "../../docs/qualification.md",
+          "exists": true
+        },
+        {
+          "target": "../../src/eval/qualification.rs",
+          "exists": true
+        },
+        {
+          "target": "reused-evidence.json",
+          "exists": true
+        },
+        {
+          "target": "../../src/storage/recall_store.rs",
+          "exists": true
+        },
+        {
+          "target": "../../src/recall.rs",
+          "exists": true
+        },
+        {
+          "target": "../../src/storage/sqlite_store.rs",
+          "exists": true
+        },
+        {
+          "target": "../../../../hosts/memory-mcp/src/memory_tools.rs",
+          "exists": true
+        },
+        {
+          "target": "../../../../hosts/memory-mcp/src/config.rs",
+          "exists": true
+        },
+        {
+          "target": "mcp-source-binding.json",
+          "exists": true
+        },
+        {
+          "target": "baseline-status.json",
+          "exists": true
+        },
+        {
+          "target": "baseline-next.json",
+          "exists": true
+        },
+        {
+          "target": "source-byte-audit.json",
+          "exists": true
+        },
+        {
+          "target": "corpus.json",
+          "exists": true
+        },
+        {
+          "target": "protocol.json",
+          "exists": true
+        },
+        {
+          "target": "run_probe.py",
+          "exists": true
+        },
+        {
+          "target": "host_probe.py",
+          "exists": true
+        },
+        {
+          "target": "host-config-bindings.json",
+          "exists": true
+        },
+        {
+          "target": "evidence-redaction.json",
+          "exists": true
+        },
+        {
+          "target": "assessment.json",
+          "exists": true
+        },
+        {
+          "target": "answers.json",
+          "exists": true
+        },
+        {
+          "target": "timed-repeat-protocol.json",
+          "exists": true
+        },
+        {
+          "target": "timed-run-01/run.json",
+          "exists": true
+        },
+        {
+          "target": "assess_timed.py",
+          "exists": true
+        },
+        {
+          "target": "packet-audit.json",
+          "exists": true
+        },
+        {
+          "target": "harness-correction.json",
+          "exists": true
+        },
+        {
+          "target": "test_probe.py",
+          "exists": true
+        },
+        {
+          "target": "validation.json",
+          "exists": true
+        },
+        {
+          "target": "docs-validation.json",
+          "exists": true
+        },
+        {
+          "target": "prepare_observations.py",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "name": "qualification-readback",
+      "passed": true,
+      "recordedOutcomes": [
+        {
+          "observation": "host-run-02-cross-session",
+          "claim": "host.cross-session",
+          "exitCode": 1,
+          "outcome": "inconclusive",
+          "provenance": "external-observation",
+          "receiptId": "1a5ac02d-aaaf-42b3-8813-8f3f6967e3e1",
+          "sequence": 1
+        },
+        {
+          "observation": "host-run-03-cross-session",
+          "claim": "host.cross-session",
+          "exitCode": 0,
+          "outcome": "satisfied",
+          "provenance": "external-observation",
+          "receiptId": "d2e0f633-b2d7-4a5a-ae2c-7ca672772194",
+          "sequence": 2
+        },
+        {
+          "observation": "second-host-isolation-blocked",
+          "claim": "host.agent-isolation",
+          "exitCode": 1,
+          "outcome": "inconclusive",
+          "provenance": "external-observation",
+          "receiptId": "cfa93e81-aa37-448c-866f-1b7b8b060cba",
+          "sequence": 3
+        },
+        {
+          "observation": "timed-answer-quality",
+          "claim": "recall.answer-quality",
+          "exitCode": 0,
+          "outcome": "satisfied",
+          "provenance": "external-observation",
+          "receiptId": "a8fed2a6-3bcf-43ef-b0ff-d44d98baa5aa",
+          "sequence": 4
+        }
+      ],
+      "status": "final-status.json",
+      "next": "final-next.json"
+    },
+    {
+      "name": "git-staged-whitespace",
+      "passed": true,
+      "detail": "Evidence-only .gitattributes preserves original bytes and recognizes CRLF; initial default check flagged CR as trailing whitespace, resolved without changing hash-bound evidence bytes."
+    }
+  ]
+}

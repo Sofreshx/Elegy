@@ -1,15 +1,20 @@
 use crate::HostError;
 use base64::Engine as _;
 use elegy_core::{
-    compose_runtime_state, CatalogResource, ProjectLocator, ReadResourceError, ResourceReadResult,
-    RuntimeState,
+    compose_runtime_state, CatalogResource, CoreError, ProjectLocator, ReadResourceError,
+    ResourceReadResult, RuntimeState,
 };
 use rmcp::{
-    model::*, transport::stdio, ErrorData as McpError, RoleServer, ServerHandler, ServiceExt,
+    model::*, service::ServerInitializeError, transport::stdio, ErrorData as McpError, RoleServer,
+    ServerHandler, ServiceExt,
 };
 use serde_json::json;
 use std::sync::Arc;
 use tokio::task;
+
+/// URI of the single diagnostic resource served when the host starts in
+/// degraded mode (descriptor configuration failed to load).
+const DIAGNOSTICS_URI: &str = "elegy://host/diagnostics";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HostOptions {
@@ -28,8 +33,17 @@ impl Default for HostOptions {
     }
 }
 
+/// Runtime posture of the host: either a fully composed project, or a
+/// degraded fallback carrying the diagnostics that explain why composition
+/// failed. The host always serves one of these — it never dies before the
+/// MCP transport opens.
+enum HostState {
+    Ready(Arc<RuntimeState>),
+    Degraded(CoreError),
+}
+
 pub struct ElegyMcpHost {
-    state: Arc<RuntimeState>,
+    state: HostState,
     #[allow(dead_code)]
     options: HostOptions,
 }
@@ -41,7 +55,17 @@ impl ElegyMcpHost {
 
     pub fn with_options(state: RuntimeState, options: HostOptions) -> Self {
         Self {
-            state: Arc::new(state),
+            state: HostState::Ready(Arc::new(state)),
+            options,
+        }
+    }
+
+    /// Build a host that serves no real resources because the project's
+    /// descriptor configuration failed to load. It still answers `initialize`
+    /// and exposes a single diagnostic resource describing `error`.
+    pub fn degraded(error: CoreError, options: HostOptions) -> Self {
+        Self {
+            state: HostState::Degraded(error),
             options,
         }
     }
@@ -55,23 +79,54 @@ pub async fn serve_stdio_with_options(
     locator: ProjectLocator,
     options: HostOptions,
 ) -> Result<(), HostError> {
-    let state = compose_runtime_state(locator)?;
-    let server = ElegyMcpHost::with_options(state, options)
-        .serve(stdio())
-        .await?;
+    let host = match compose_runtime_state(locator) {
+        Ok(state) => {
+            tracing::info!(
+                project = %state.catalog().project_name,
+                resources = state.catalog().resource_count,
+                "elegy-run resolved project descriptors"
+            );
+            ElegyMcpHost::with_options(state, options)
+        }
+        Err(error) => {
+            for diagnostic in error.diagnostics() {
+                tracing::error!(
+                    code = %diagnostic.code,
+                    message = %diagnostic.message,
+                    "elegy-run starting in degraded mode: descriptor configuration failed to load"
+                );
+            }
+            ElegyMcpHost::degraded(error, options)
+        }
+    };
+
+    let server = match host.serve(stdio()).await {
+        Ok(server) => server,
+        Err(ServerInitializeError::ConnectionClosed(reason)) => {
+            // The client tore down the transport before/while initializing
+            // (e.g. a host releasing a port during its own shutdown). This is
+            // not a program error: log it and exit cleanly instead of
+            // propagating a Debug-formatted panic-shaped error.
+            tracing::info!(%reason, "client closed the connection during initialize; exiting");
+            return Ok(());
+        }
+        Err(other) => return Err(other.into()),
+    };
     server.waiting().await?;
     Ok(())
 }
 
 impl ServerHandler for ElegyMcpHost {
     fn get_info(&self) -> ServerInfo {
+        let instructions = match &self.state {
+            HostState::Ready(_) => "Elegy exposes runtime-composed MCP resources over stdio. \
+                 This host supports resources/list and resources/read."
+                .to_string(),
+            HostState::Degraded(error) => degraded_instructions(error),
+        };
         ServerInfo::new(ServerCapabilities::builder().enable_resources().build())
             .with_server_info(Implementation::from_build_env())
-            .with_instructions(
-                "Elegy exposes runtime-composed MCP resources over stdio. \
-             This host supports resources/list and resources/read."
-                    .to_string(),
-            )
+            .with_instructions(instructions)
     }
 
     async fn list_resources(
@@ -79,14 +134,17 @@ impl ServerHandler for ElegyMcpHost {
         _request: Option<PaginatedRequestParams>,
         _context: rmcp::service::RequestContext<RoleServer>,
     ) -> Result<ListResourcesResult, McpError> {
-        Ok(ListResourcesResult {
-            resources: self
-                .state
+        let resources = match &self.state {
+            HostState::Ready(state) => state
                 .catalog()
                 .resources
                 .iter()
                 .map(resource_to_mcp)
                 .collect(),
+            HostState::Degraded(_) => vec![diagnostics_resource_descriptor()],
+        };
+        Ok(ListResourcesResult {
+            resources,
             next_cursor: None,
             meta: None,
         })
@@ -110,7 +168,23 @@ impl ServerHandler for ElegyMcpHost {
         _context: rmcp::service::RequestContext<RoleServer>,
     ) -> Result<ReadResourceResult, McpError> {
         let uri = request.uri;
-        let state = Arc::clone(&self.state);
+        let state = match &self.state {
+            HostState::Ready(state) => Arc::clone(state),
+            HostState::Degraded(error) => {
+                return if uri == DIAGNOSTICS_URI {
+                    Ok(ReadResourceResult::new(vec![
+                        diagnostics_resource_contents(error),
+                    ]))
+                } else {
+                    Err(McpError::resource_not_found(
+                        "resource_not_found",
+                        Some(
+                            json!({ "uri": uri, "reason": "host is running in degraded mode; only elegy://host/diagnostics is available" }),
+                        ),
+                    ))
+                };
+            }
+        };
         let read_uri = uri.clone();
         let result = task::spawn_blocking(move || state.read_resource(read_uri.as_str()))
             .await
@@ -147,6 +221,41 @@ impl ServerHandler for ElegyMcpHost {
             Some(json!({"tool": request.name})),
         ))
     }
+}
+
+/// Human-readable explanation, appended to `get_info().instructions`, for why
+/// the host is running with no real resources.
+fn degraded_instructions(error: &CoreError) -> String {
+    let mut text = String::from(
+        "Elegy MCP host started in DEGRADED mode: this project's descriptor \
+         configuration failed to load, so no real resources are served. \
+         Read the elegy://host/diagnostics resource for the exact \
+         diagnostic(s), fix the referenced elegy.toml/descriptor file, then \
+         restart this host.",
+    );
+    for diagnostic in error.diagnostics() {
+        text.push_str(&format!("\n- [{}] {}", diagnostic.code, diagnostic.message));
+    }
+    text
+}
+
+/// The single resource entry exposed by `resources/list` in degraded mode.
+fn diagnostics_resource_descriptor() -> Resource {
+    RawResource::new(DIAGNOSTICS_URI, "Elegy Host Diagnostics")
+        .with_mime_type("application/json")
+        .with_description(
+            "Structured diagnostics explaining why this host started in degraded mode.",
+        )
+        .no_annotation()
+}
+
+/// The body returned by `resources/read` for `elegy://host/diagnostics`.
+fn diagnostics_resource_contents(error: &CoreError) -> ResourceContents {
+    let payload = json!({
+        "status": "degraded",
+        "diagnostics": error.diagnostics(),
+    });
+    ResourceContents::text(payload.to_string(), DIAGNOSTICS_URI).with_mime_type("application/json")
 }
 
 fn resource_to_mcp(resource: &CatalogResource) -> Resource {

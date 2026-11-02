@@ -123,10 +123,6 @@ impl MemoryRepository {
             return Ok(Vec::new());
         }
 
-        // Unowned rows cannot be expressed as an `agent_id` equality filter, so
-        // that dimension moves to `is_visible_memory` and ranking runs
-        // untruncated. The store scores every candidate before truncating and
-        // the MCP never sets a context budget, so over-fetching is free here.
         let owned_only = !self.binding.include_unowned() && self.binding.shared_agents().is_none();
         let query = SearchQuery {
             text: query.to_string(),
@@ -134,11 +130,7 @@ impl MemoryRepository {
             scope: self.binding.read_scope(),
             state_filter: args.state_filter(),
             type_filter: args.memory_types.clone().map(tool_memory_types),
-            max_results: if owned_only || self.binding.shared_agents().is_some() {
-                args.limit()
-            } else {
-                usize::MAX
-            },
+            max_results: args.limit(),
             context_config: None,
             session_id: None,
             agent_id: owned_only.then(|| self.agent_id_owned()),
@@ -146,6 +138,10 @@ impl MemoryRepository {
         let matches = if let Some(shared) = self.binding.shared_agents() {
             self.store
                 .search_shared_agents(query, self.agent_id(), shared)
+                .await?
+        } else if self.binding.include_unowned() {
+            self.store
+                .search_agent_and_unowned(query, self.agent_id())
                 .await?
         } else {
             self.store.search(query).await?

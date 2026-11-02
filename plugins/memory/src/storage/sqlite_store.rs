@@ -460,6 +460,22 @@ impl SqliteMemoryStore {
         self.search_with_access(query, Some(&access)).await
     }
 
+    /// Search a trusted legacy binding's owned and unowned rows. Scope and
+    /// tenant/user visibility retain the legacy host policy; ownership is
+    /// applied in SQL before ranking, truncation and retrieval effects.
+    pub async fn search_agent_and_unowned(
+        &self,
+        query: SearchQuery,
+        caller: &str,
+    ) -> Result<Vec<ScoredMemory>, StoreError> {
+        if caller.trim().is_empty() {
+            return Err(StoreError::Validation("invalid agent binding".to_string()));
+        }
+        let access =
+            recall_store::RecallAccess::for_agent_and_unowned(query.scope.visible_scopes(), caller);
+        self.search_with_access(query, Some(&access)).await
+    }
+
     async fn search_with_access(
         &self,
         query: SearchQuery,

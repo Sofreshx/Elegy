@@ -198,12 +198,22 @@ install, auth, approvals, runtime sessions, and execution policy.
 ## MCP interfaces
 
 ```bash
-elegy-run
+elegy-run --project /path/to/a/project/with/elegy.toml
 ```
 
-MCP resources and tools are first-class catalog interfaces served by the host;
-they are not fallback routes for CLI entries. Side-effecting tools stay blocked
-unless the host is started with `--allow-side-effects`.
+`elegy-run` (`hosts/host-mcp`) serves **MCP resources only**: `list_tools`
+always returns an empty list and `call_tool` always errors, by design — MCP
+tool projection was removed in favor of direct CLI invocation. The `--project`
+target must be a project whose `elegy.toml` resolves descriptors (see
+`descriptors.include`, default `elegy.resources.d/*.toml`); a project with no
+matching descriptor file still completes the MCP handshake, but starts in a
+degraded mode that serves only a single `elegy://host/diagnostics` resource.
+Run `elegy-run --project <path> --preflight` to check a project's descriptor
+configuration without opening the MCP transport.
+
+Side-effecting tools stay blocked unless the host is started with
+`--allow-side-effects` (this flag currently has no effect while `call_tool`
+is unconditionally disabled).
 
 The v1 `app-binding` kind is retained only for packages with a native Codex app
 connection binding. The v1 `fallback` field has no active runtime consumer and

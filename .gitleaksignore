@@ -10,3 +10,8 @@
 2d4f788285a3b42ae905e9d73bb2b28910bb8a84:plugins/memory/evidence/stored-version-qualification-2026-10-23/native-validation/fmt.json:generic-api-key:348
 2d4f788285a3b42ae905e9d73bb2b28910bb8a84:plugins/memory/evidence/stored-version-qualification-2026-10-23/native-validation/memory.json:generic-api-key:331
 2d4f788285a3b42ae905e9d73bb2b28910bb8a84:plugins/memory/evidence/stored-version-qualification-2026-10-23/native-validation/memory.json:generic-api-key:351
+# Exact historical source SHA-256 evidence, verified against its referenced source; not a credential.
+48df62ff9c5842e02097f6ea951faa7543ce71ae:hosts/memory-mcp/evidence/shared-agents-2026-10-24.json:generic-api-key:10
+# Exact historical static private-key fixtures from test-only modules; no rule or path exemption.
+9e926dd34a5995511f3dc72ac821eac7dbb04088:hosts/memory-mcp/src/resource_auth.rs:private-key:267
+9e926dd34a5995511f3dc72ac821eac7dbb04088:hosts/memory-mcp/src/tests.rs:private-key:105

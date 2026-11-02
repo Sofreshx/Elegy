@@ -1,0 +1,43 @@
+{
+  "answer": "Je n’ai pas accès au code d’audit privé de l’autre équipe.",
+  "threadId": "01a166cb-44a8-7312-9b63-a1e13121da5c",
+  "usage": {
+    "input_tokens": 20686,
+    "cached_input_tokens": 10496,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 20,
+    "reasoning_output_tokens": 0
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a166cb-44a8-7312-9b63-a1e13121da5c\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Je n’ai pas accès au code d’audit privé de l’autre équipe.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20686,\"cached_input_tokens\":10496,\"cache_write_input_tokens\":0,\"output_tokens\":20,\"reasoning_output_tokens\":0}}\n",
+  "stderr": "2026-10-23T03:25:59.863798Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q15",
+  "arm": "with",
+  "startedAt": "2026-10-23T03:25:59.416771+00:00",
+  "completedAt": "2026-10-23T03:26:05.528300+00:00",
+  "elapsedMs": 6111.793,
+  "promptSha256": "2aaf898cef66b4b7f16bca4beabadb5f2b3ba46e8cf53bdb0e1a3c7ca8cb9fb3",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

@@ -1,0 +1,172 @@
+{
+  "schemaVersion": "memory-qualification-reuse/v1",
+  "retrievedAt": "2026-10-04T18:15:40.599Z",
+  "pullRequest": {
+    "url": "https://github.com/Sofreshx/Elegy/pull/47",
+    "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+    "mergeCommit": "f4445a4c01359ec23238d01ab6470292c05732cd",
+    "mergedAt": "2026-10-01T13:09:37Z"
+  },
+  "reviews": [],
+  "checks": [
+    {
+      "name": "CodeQL",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:26:13Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/runs/110204253578"
+    },
+    {
+      "name": "zizmor",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:17:29Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/runs/110202160457"
+    },
+    {
+      "name": "test (ubuntu-latest)",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:20:44Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809807990/job/110202119741"
+    },
+    {
+      "name": "docs check v2 (authoritative)",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:17:48Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809807990/job/110202119612"
+    },
+    {
+      "name": "clippy",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:17:56Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809807990/job/110202119589"
+    },
+    {
+      "name": "test (macos-latest)",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:21:28Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809807990/job/110202119557"
+    },
+    {
+      "name": "fmt",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:17:35Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809807990/job/110202119546"
+    },
+    {
+      "name": "test (windows-latest)",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:28:24Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809807990/job/110202119524"
+    },
+    {
+      "name": "cargo run -p elegy-memory -- eval run --ci",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:18:14Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809807990/job/110202119512"
+    },
+    {
+      "name": "zizmor",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:17:35Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809808023/job/110202119499"
+    },
+    {
+      "name": "packaging smoke",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:17:56Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809807990/job/110202119462"
+    },
+    {
+      "name": "gitleaks",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:17:28Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809807943/job/110202119302"
+    },
+    {
+      "name": "codeql",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:26:19Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809807943/job/110202119282"
+    },
+    {
+      "name": "cargo-deny",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:17:41Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809807943/job/110202119270"
+    },
+    {
+      "name": "msrv check (Rust 1.88)",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:18:57Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809807990/job/110202119264"
+    },
+    {
+      "name": "export contracts bundle",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:17:46Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809807937/job/110202119064"
+    },
+    {
+      "name": "cargo-audit",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:17:40Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809807943/job/110202119029"
+    },
+    {
+      "name": "contracts-validate",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:18:02Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809807954/job/110202119020"
+    },
+    {
+      "name": "package installer bootstrap",
+      "conclusion": "success",
+      "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+      "completedAt": "2026-10-01T03:17:24Z",
+      "detailsUrl": "https://github.com/Sofreshx/Elegy/actions/runs/36809807937/job/110202118891"
+    }
+  ],
+  "remoteMain": {
+    "sha": "33421fa298fdd7d05133a9b6c02475c730f3fee4",
+    "message": "docs: mark personal-harness development as shelved"
+  },
+  "localConcurrency": {
+    "originalBranch": "codex/memory-developer-experience",
+    "originalHead": "acc6b4e22625841ce0fdde55226472cd416728f1",
+    "activeOtherWork": "Documentation and test-file rearrangement in original checkout; untouched by this qualification",
+    "isolatedBranch": "codex/memory-qualification-oct04"
+  },
+  "build": {
+    "command": "cargo build --offline --locked -p elegy-memory -p elegy-memory-mcp --bin elegy-memory --bin elegy-memory-mcp-stdio",
+    "exitCode": 0,
+    "profile": "dev",
+    "durationSeconds": 305,
+    "sourceHead": "acc6b4e22625841ce0fdde55226472cd416728f1",
+    "trackedSourceClean": true,
+    "cliSha256": "92692d62c558feba70a4b8df17f1575d1fbb42aa7db31be3abf855ee255af960",
+    "mcpSha256": "901361065cedcd54091f828a96f77768283e596ee980f18372eac86d13246eaf"
+  },
+  "installed": {
+    "mcpSha256": "7e53251c459f755eb5312b48afdffbae06c8b4f26a6bb5a73192677c6cd9c555",
+    "configured": true,
+    "sourceProvenance": "unknown; file date is not source provenance"
+  },
+  "limits": "Existing suites reused, not rerun or relabelled as fresh results. No remote mutation."
+}

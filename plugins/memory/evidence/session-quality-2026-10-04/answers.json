@@ -1,0 +1,155 @@
+{
+  "schemaVersion": "memory-native-answers/v1",
+  "model": "gpt-5.6-luna",
+  "reasoningEffort": "medium",
+  "sessions": "24 new native child agents, fork_turns=none; no tools requested or observed; one case per child",
+  "timingLimit": "Timestamps are orchestrator preparation and observed notification times. They are upper bounds including orchestration gaps, not model inference latency. Exact provider latency, tokens and native monetary cost are unavailable.",
+  "paidApiCalls": 0,
+  "recallPackets": "source-run-01/packets.json",
+  "answers": {
+    "q01_without": {
+      "answer": "UNKNOWN",
+      "startedAt": 1791137297134,
+      "observedCompletedAt": 1791137366253,
+      "agent": "/root/q01_without"
+    },
+    "q03_without": {
+      "answer": "UNKNOWN",
+      "startedAt": 1791137297134,
+      "observedCompletedAt": 1791137513257,
+      "agent": "/root/q03_without"
+    },
+    "q05_without": {
+      "answer": "UNKNOWN",
+      "startedAt": 1791137366254,
+      "observedCompletedAt": 1791137513258,
+      "agent": "/root/q05_without"
+    },
+    "q07_without": {
+      "answer": "UNKNOWN",
+      "startedAt": 1791137366254,
+      "observedCompletedAt": 1791137513258,
+      "agent": "/root/q07_without"
+    },
+    "q09_without": {
+      "answer": "4",
+      "startedAt": 1791137513258,
+      "observedCompletedAt": 1791137590035,
+      "agent": "/root/q09_without"
+    },
+    "q11_without": {
+      "answer": "UNKNOWN",
+      "startedAt": 1791137513258,
+      "observedCompletedAt": 1791137590035,
+      "agent": "/root/q11_without"
+    },
+    "q01_with": {
+      "answer": "7413",
+      "startedAt": 1791137878570,
+      "observedCompletedAt": 1791137998600,
+      "agent": "/root/q01_with"
+    },
+    "q02_with": {
+      "answer": "8527",
+      "startedAt": 1791137878570,
+      "observedCompletedAt": 1791137998600,
+      "agent": "/root/q02_with"
+    },
+    "q02_without": {
+      "answer": "UNKNOWN",
+      "startedAt": 1791137998600,
+      "observedCompletedAt": 1791138250929,
+      "agent": "/root/q02_without"
+    },
+    "q03_with": {
+      "answer": "ELM",
+      "startedAt": 1791138131967,
+      "observedCompletedAt": 1791138250929,
+      "agent": "/root/q03_with"
+    },
+    "q04_with": {
+      "answer": "ASH",
+      "startedAt": 1791138131967,
+      "observedCompletedAt": 1791138250929,
+      "agent": "/root/q04_with"
+    },
+    "q04_without": {
+      "answer": "UNKNOWN",
+      "startedAt": 1791138250929,
+      "observedCompletedAt": 1791138367534,
+      "agent": "/root/q04_without"
+    },
+    "q05_with": {
+      "answer": "WEDNESDAY",
+      "startedAt": 1791138250929,
+      "observedCompletedAt": 1791138367534,
+      "agent": "/root/q05_with"
+    },
+    "q06_with": {
+      "answer": "9631",
+      "startedAt": 1791138367534,
+      "observedCompletedAt": 1791138452668,
+      "agent": "/root/q06_with"
+    },
+    "q07_with": {
+      "answer": "UNKNOWN",
+      "startedAt": 1791138367535,
+      "observedCompletedAt": 1791138452669,
+      "agent": "/root/q07_with"
+    },
+    "q06_without": {
+      "answer": "9631",
+      "startedAt": 1791138452669,
+      "observedCompletedAt": 1791138595083,
+      "agent": "/root/q06_without"
+    },
+    "q08_with": {
+      "answer": "UNKNOWN",
+      "startedAt": 1791138452669,
+      "observedCompletedAt": 1791138595083,
+      "agent": "/root/q08_with"
+    },
+    "q08_without": {
+      "answer": "UNKNOWN",
+      "startedAt": 1791138595083,
+      "observedCompletedAt": 1791138635689,
+      "agent": "/root/q08_without"
+    },
+    "q09_with": {
+      "answer": "4",
+      "startedAt": 1791138595083,
+      "observedCompletedAt": 1791138635689,
+      "agent": "/root/q09_with"
+    },
+    "q10_with": {
+      "answer": "COPPER",
+      "startedAt": 1791138595083,
+      "observedCompletedAt": 1791138678551,
+      "agent": "/root/q10_with"
+    },
+    "q10_without": {
+      "answer": "UNKNOWN",
+      "startedAt": 1791138635690,
+      "observedCompletedAt": 1791138678551,
+      "agent": "/root/q10_without"
+    },
+    "q11_with": {
+      "answer": "6305",
+      "startedAt": 1791138635690,
+      "observedCompletedAt": 1791138678551,
+      "agent": "/root/q11_with"
+    },
+    "q12_with": {
+      "answer": "UNKNOWN",
+      "startedAt": 1791138635690,
+      "observedCompletedAt": 1791138705681,
+      "agent": "/root/q12_with"
+    },
+    "q12_without": {
+      "answer": "UNKNOWN",
+      "startedAt": 1791138705681,
+      "observedCompletedAt": 1791138757129,
+      "agent": "/root/q12_without"
+    }
+  }
+}

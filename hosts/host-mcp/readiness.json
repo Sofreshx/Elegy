@@ -3,14 +3,15 @@
   "surface": "elegy-run",
   "surfaceVersion": "0.1.0",
   "stage": "implemented",
-  "summary": "The MCP stdio host can list and read supported static resources in source tests.",
-  "worksToday": ["Serves supported resources over an MCP duplex transport.", "Preserves text and binary resource payload distinctions."],
-  "limitations": ["Does not make every Elegy surface a working MCP tool.", "No clean packaged installation or non-fixture host task has been reviewed."],
+  "summary": "The MCP stdio host lists and reads supported resources, and now always completes the MCP handshake even when a project's descriptors fail to load, verified against a real spawned process.",
+  "worksToday": ["Serves supported resources over an MCP duplex transport, and over a real stdio child process against the actual repository root.", "Preserves text and binary resource payload distinctions.", "Completes MCP initialize and serves a structured elegy://host/diagnostics resource when descriptor composition fails, instead of exiting before the handshake.", "Exposes --preflight to check a project's descriptor configuration without opening the MCP transport, wired into .elegy/checks.json and CI."],
+  "limitations": ["Does not make every Elegy surface a working MCP tool: list_tools is always empty and call_tool always errors by design.", "No clean packaged installation driven by a real external MCP client (e.g. an actual Claude Desktop session) has been reviewed; only a real spawned-process test in source."],
   "supportedEnvironments": ["Windows source build; portable Rust implementation"],
-  "installation": "Build from source with cargo build -p elegy-host-mcp.",
-  "invocation": "Run elegy-run with a supported project descriptor.",
+  "installation": "Build from source with cargo build -p elegy-host-mcp, or `just install-mcp` for a receipted local install.",
+  "invocation": "Run elegy-run --project <path to a project with descriptors>. Use --preflight to check the project without opening the MCP transport.",
   "evidence": [
     {"kind": "source-tests", "path": "./evidence/readiness-2026-07-30.json", "summary": "Host resource transport tests passed."},
-    {"kind": "package-verification", "path": "./evidence/readiness-2026-07-30.json", "summary": "The workspace package compiled as part of the source suite."}
+    {"kind": "package-verification", "path": "./evidence/readiness-2026-07-30.json", "summary": "The workspace package compiled as part of the source suite."},
+    {"kind": "source-tests", "path": "./evidence/readiness-2026-09-05.json", "summary": "Real spawned-process MCP handshake tests against the actual repo root and a degraded-mode project passed; see docs/adr/2026-09-05-mcp-host-descriptor-contract.md."}
   ]
 }

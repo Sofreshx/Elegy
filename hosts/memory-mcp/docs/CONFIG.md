@@ -95,6 +95,71 @@ its dedicated key/connection withdraws cloud access without deleting the DB.
 `memory_delete` is permanent: exposing the tool does not authorize deleting
 real contributions. Keep test fixtures separate from the real database.
 
+### Local activation helpers
+
+[`install-shared-memory.py`](../../../scripts/install-shared-memory.py) takes
+an explicitly reviewed local plan and SHA-256. It defaults to validation only.
+`--apply-approved` snapshots the existing SQLite database, saves only the old
+Memory configuration section, installs pinned binaries and replaces that
+section without starting a process. Close Codex before applying it to avoid
+concurrent preference writes. `--rollback-config-approved` restores only the
+old Memory binding; it never restores/deletes the database or discards new
+memories. Keep the database snapshot private and preserve existing evidence.
+The plan must contain no credentials; only listed Memory environment settings
+are accepted. These helpers do not configure other agent hosts implicitly.
+
+The installer requires Python 3.12 or newer. Its private receipt binds the exact
+reviewed plan hash to `prepared`, `snapshot-ready`, `configured` and `rolled-back`
+phases. Repeating the same approved command resumes an interrupted apply or
+finishes an already written binding after a receipt failure. It verifies the
+original binding, snapshot hash and SQLite integrity before reusing a completed
+snapshot; it never overwrites that snapshot or a differing installed executable.
+A snapshot candidate without a verification receipt stays on disk, and retry
+creates a fresh candidate. Use the receipt's `backupPath` and `backupSha256`
+for a later approved launch. A changed Memory binding blocks apply/rollback;
+unrelated preferences are re-read and preserved. An older receipt without these
+phases requires local review rather than being silently upgraded.
+
+Text replacements and executable copies flush and sync their temporary files
+before publication. Windows directory-entry syncing is not provided here, so
+this is interruption recovery rather than a guarantee against every power-loss
+case. Keep the private plan, original binding, snapshots and receipt together.
+The installer compares the complete original configuration bytes again after
+flushing its temporary file and immediately before replacing the configuration;
+an intervening edit aborts that replacement. The comparison and filesystem
+replacement are separate operations, so an external write in the remaining
+interval cannot be excluded. Run one installer at a time and close Codex and
+every other configuration writer before apply/rollback, including retries.
+No shared lock or indivisible compare-and-swap with those programs is provided.
+
+[`start-private-memory-tunnel.ps1`](../../../scripts/start-private-memory-tunnel.ps1)
+also defaults to preflight only. An approved launch additionally requires a
+verified restricted runtime key permission, confirmed MCP authentication mode
+and a pinned distinct backup. It requests the key locally with masked input,
+passes it only to the owned child environment and drains output without saving
+it. One fresh runtime home is used per launch. The process is supervised for
+at most fifteen minutes including doctor; no service or restart is installed.
+Inspect the controlled status after early exit or termination failure and
+revoke the dedicated key manually. A successful process start is not proof of
+a cloud tool call; the caller in the real cloud session must verify that.
+The supervisor supports Windows with PowerShell 7.2 or newer. If saving status
+fails during error handling or final cleanup, it emits a generic warning and
+still stops its owned process tree. A missing status file does not establish
+that the process stopped or the key was revoked.
+Status is enabled only after validating the caller's profile directory; an
+earlier failure writes no status file. `-SelfTest` uses a fresh directory under
+the operating system temp directory, or an existing, explicitly supplied
+`-SelfTestDirectory`. Its child runtime home and fictional status receipt stay
+there. The helper rejects its own source directory as a status destination.
+
+Reproducible local fixtures are in
+[`test_install_shared_memory.py`](../../../scripts/tests/test_install_shared_memory.py)
+and [`test_private_memory_tunnel.ps1`](../../../scripts/tests/test_private_memory_tunnel.ps1).
+Run `python -m unittest discover -s scripts/tests -p test_install_shared_memory.py -v`
+and `pwsh -NoProfile -NonInteractive -File scripts/tests/test_private_memory_tunnel.ps1`
+from the repository root. They use only fictional files/databases and owned
+local test processes under `target/qualification`; no live tunnel or key is used.
+
 ### Embedding boot policy
 
 The embedding provider probe is `GET <OLLAMA_URL>/api/tags` with a 5-second

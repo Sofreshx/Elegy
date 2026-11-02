@@ -1,0 +1,818 @@
+{
+  "schemaVersion": "memory-replay-episode/v1",
+  "id": "lumen",
+  "startedAt": "2026-10-23T03:20:06.054398+00:00",
+  "status": "failed",
+  "stages": [],
+  "rpc": [
+    {
+      "client": "q04-write-release",
+      "timestamp": "2026-10-23T03:20:06.343266+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 297.0
+    },
+    {
+      "client": "q04-write-release",
+      "timestamp": "2026-10-23T03:20:06.343266+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q04-write-release",
+      "timestamp": "2026-10-23T03:20:06.350177+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_store",
+          "arguments": {
+            "content": "Lumen release approval belongs to ROLE_KITE; required preflight is CHECK_DELTA.",
+            "importance": 0.9,
+            "provenance": "user-stated"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"action\":\"added\",\"embeddingStatus\":\"skipped_no_provider\",\"gateResult\":\"accepted\",\"memory\":{\"content\":\"Lumen release approval belongs to ROLE_KITE; required preflight is CHECK_DELTA.\",\"createdAt\":\"2026-10-23T03:20:06.347122700+00:00\",\"id\":\"3eb16534-9f72-4620-b006-39b0dbc9bcf7\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:20:06.347122700+00:00\"},\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "action": "added",
+            "embeddingStatus": "skipped_no_provider",
+            "gateResult": "accepted",
+            "memory": {
+              "content": "Lumen release approval belongs to ROLE_KITE; required preflight is CHECK_DELTA.",
+              "createdAt": "2026-10-23T03:20:06.347122700+00:00",
+              "id": "3eb16534-9f72-4620-b006-39b0dbc9bcf7",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:20:06.347122700+00:00"
+            },
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q04-write-release",
+      "timestamp": "2026-10-23T03:20:06.528212+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:06.075604Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "q04-write-other",
+      "timestamp": "2026-10-23T03:20:06.561207+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 16.0
+    },
+    {
+      "client": "q04-write-other",
+      "timestamp": "2026-10-23T03:20:06.561207+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q04-write-other",
+      "timestamp": "2026-10-23T03:20:06.637171+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_store",
+          "arguments": {
+            "content": "Lumen-Lab release approval belongs to ROLE_SAND; required preflight is CHECK_WAVE.",
+            "importance": 0.9,
+            "provenance": "user-stated"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"action\":\"added\",\"embeddingStatus\":\"skipped_no_provider\",\"gateResult\":\"accepted\",\"memory\":{\"content\":\"Lumen-Lab release approval belongs to ROLE_SAND; required preflight is CHECK_WAVE.\",\"createdAt\":\"2026-10-23T03:20:06.563610100+00:00\",\"id\":\"5b709747-65be-4c4a-8a96-373658f691c8\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:20:06.563610100+00:00\"},\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "action": "added",
+            "embeddingStatus": "skipped_no_provider",
+            "gateResult": "accepted",
+            "memory": {
+              "content": "Lumen-Lab release approval belongs to ROLE_SAND; required preflight is CHECK_WAVE.",
+              "createdAt": "2026-10-23T03:20:06.563610100+00:00",
+              "id": "5b709747-65be-4c4a-8a96-373658f691c8",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:20:06.563610100+00:00"
+            },
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 78.0
+    },
+    {
+      "client": "q04-write-other",
+      "timestamp": "2026-10-23T03:20:06.895389+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:06.547928Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "q04-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:06.928191+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 31.0
+    },
+    {
+      "client": "q04-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:06.928191+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q04-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:06.931193+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_recall",
+          "arguments": {
+            "id": "3eb16534-9f72-4620-b006-39b0dbc9bcf7"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"found\":true,\"memory\":{\"content\":\"Lumen release approval belongs to ROLE_KITE; required preflight is CHECK_DELTA.\",\"createdAt\":\"2026-10-23T03:20:06.347122700+00:00\",\"id\":\"3eb16534-9f72-4620-b006-39b0dbc9bcf7\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:20:06.347122700+00:00\"},\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "found": true,
+            "memory": {
+              "content": "Lumen release approval belongs to ROLE_KITE; required preflight is CHECK_DELTA.",
+              "createdAt": "2026-10-23T03:20:06.347122700+00:00",
+              "id": "3eb16534-9f72-4620-b006-39b0dbc9bcf7",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:20:06.347122700+00:00"
+            },
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q04-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:07.002803+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_search",
+          "arguments": {
+            "query": "Lumen release approval belongs to ROLE_KITE; required preflight is CHECK_DELTA.",
+            "limit": 100
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":1,\"includeDormant\":false,\"namespace\":\"qual-a\",\"query\":\"Lumen release approval belongs to ROLE_KITE; required preflight is CHECK_DELTA.\",\"results\":[{\"id\":\"3eb16534-9f72-4620-b006-39b0dbc9bcf7\",\"memoryType\":\"observation\",\"preview\":\"Lumen release approval belongs to ROLE_KITE; required preflight is CHECK_DELTA.\",\"score\":1.0126420259475708,\"similarity\":1.0,\"state\":\"active\"}]}"
+            }
+          ],
+          "structuredContent": {
+            "count": 1,
+            "includeDormant": false,
+            "namespace": "qual-a",
+            "query": "Lumen release approval belongs to ROLE_KITE; required preflight is CHECK_DELTA.",
+            "results": [
+              {
+                "id": "3eb16534-9f72-4620-b006-39b0dbc9bcf7",
+                "memoryType": "observation",
+                "preview": "Lumen release approval belongs to ROLE_KITE; required preflight is CHECK_DELTA.",
+                "score": 1.0126420259475708,
+                "similarity": 1.0,
+                "state": "active"
+              }
+            ]
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 78.0
+    },
+    {
+      "client": "q04-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:07.104495+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:06.915782Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "lumen-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:07.233665+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 31.0
+    },
+    {
+      "client": "lumen-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:07.233665+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "lumen-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:07.240148+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":2,\"includeDormant\":true,\"memories\":[{\"id\":\"5b709747-65be-4c4a-8a96-373658f691c8\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"preview\":\"Lumen-Lab release approval belongs to ROLE_SAND; required preflight is CHECK_WAVE.\",\"provenance\":\"user-stated\",\"state\":\"active\",\"updatedAt\":\"2026-10-23T03:20:06.563610100+00:00\"},{\"id\":\"3eb16534-9f72-4620-b006-39b0dbc9bcf7\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"preview\":\"Lumen release approval belongs to ROLE_KITE; required preflight is CHECK_DELTA.\",\"provenance\":\"user-stated\",\"state\":\"active\",\"updatedAt\":\"2026-10-23T03:20:06.347122700+00:00\"}],\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 2,
+            "includeDormant": true,
+            "memories": [
+              {
+                "id": "5b709747-65be-4c4a-8a96-373658f691c8",
+                "importance": 0.8999999761581421,
+                "memoryType": "observation",
+                "preview": "Lumen-Lab release approval belongs to ROLE_SAND; required preflight is CHECK_WAVE.",
+                "provenance": "user-stated",
+                "state": "active",
+                "updatedAt": "2026-10-23T03:20:06.563610100+00:00"
+              },
+              {
+                "id": "3eb16534-9f72-4620-b006-39b0dbc9bcf7",
+                "importance": 0.8999999761581421,
+                "memoryType": "observation",
+                "preview": "Lumen release approval belongs to ROLE_KITE; required preflight is CHECK_DELTA.",
+                "provenance": "user-stated",
+                "state": "active",
+                "updatedAt": "2026-10-23T03:20:06.347122700+00:00"
+              }
+            ],
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "lumen-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:07.310592+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_delete",
+          "arguments": {
+            "id": "5b709747-65be-4c4a-8a96-373658f691c8"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"deleted\":true,\"id\":\"5b709747-65be-4c4a-8a96-373658f691c8\",\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "deleted": true,
+            "id": "5b709747-65be-4c4a-8a96-373658f691c8",
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 63.0
+    },
+    {
+      "client": "lumen-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:07.312639+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 4,
+        "params": {
+          "name": "memory_delete",
+          "arguments": {
+            "id": "3eb16534-9f72-4620-b006-39b0dbc9bcf7"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"deleted\":true,\"id\":\"3eb16534-9f72-4620-b006-39b0dbc9bcf7\",\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "deleted": true,
+            "id": "3eb16534-9f72-4620-b006-39b0dbc9bcf7",
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 15.0
+    },
+    {
+      "client": "lumen-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:07.314100+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 5,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "lumen-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:07.613788+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:07.218886Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "lumen-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:07.654361+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 32.0
+    },
+    {
+      "client": "lumen-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:07.654361+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "lumen-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:07.657402+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-b\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-b"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 15.0
+    },
+    {
+      "client": "lumen-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:07.658369+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-b\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-b"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "lumen-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:07.668374+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:07.636675Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    }
+  ],
+  "checks": [],
+  "cleanup": [
+    {
+      "agent": "qual-a",
+      "deletedIds": [
+        "5b709747-65be-4c4a-8a96-373658f691c8",
+        "3eb16534-9f72-4620-b006-39b0dbc9bcf7"
+      ],
+      "verifiedEmpty": true
+    },
+    {
+      "agent": "qual-b",
+      "deletedIds": [],
+      "verifiedEmpty": true
+    }
+  ],
+  "error": {
+    "type": "AssertionError",
+    "message": "Recall CLI failed"
+  },
+  "failedStage": {
+    "caseId": "q04",
+    "actions": [
+      {
+        "key": "release",
+        "op": "store",
+        "result": {
+          "action": "added",
+          "embeddingStatus": "skipped_no_provider",
+          "gateResult": "accepted",
+          "memory": {
+            "content": "Lumen release approval belongs to ROLE_KITE; required preflight is CHECK_DELTA.",
+            "createdAt": "2026-10-23T03:20:06.347122700+00:00",
+            "id": "3eb16534-9f72-4620-b006-39b0dbc9bcf7",
+            "importance": 0.8999999761581421,
+            "memoryType": "observation",
+            "provenance": "user-stated",
+            "reliability": 1.0,
+            "state": "active",
+            "tags": [],
+            "updatedAt": "2026-10-23T03:20:06.347122700+00:00"
+          },
+          "namespace": "qual-a"
+        }
+      },
+      {
+        "key": "other",
+        "op": "store",
+        "result": {
+          "action": "added",
+          "embeddingStatus": "skipped_no_provider",
+          "gateResult": "accepted",
+          "memory": {
+            "content": "Lumen-Lab release approval belongs to ROLE_SAND; required preflight is CHECK_WAVE.",
+            "createdAt": "2026-10-23T03:20:06.563610100+00:00",
+            "id": "5b709747-65be-4c4a-8a96-373658f691c8",
+            "importance": 0.8999999761581421,
+            "memoryType": "observation",
+            "provenance": "user-stated",
+            "reliability": 1.0,
+            "state": "active",
+            "tags": [],
+            "updatedAt": "2026-10-23T03:20:06.563610100+00:00"
+          },
+          "namespace": "qual-a"
+        }
+      }
+    ],
+    "checks": [
+      {
+        "name": "fresh-mcp-id-and-search",
+        "passed": true
+      }
+    ],
+    "sessionId": "lumen-q04-fresh",
+    "turnId": "q04",
+    "cliDiagnostic": {
+      "exitCode": 1,
+      "response": {
+        "schemaVersion": "elegy.cli/v1",
+        "correlationId": "elegy-memory-18796-1792725607176289100",
+        "nonInteractive": true,
+        "command": [
+          "contextual-recall"
+        ],
+        "status": "invalid",
+        "failure": {
+          "code": "CLI-INVALID-INPUT",
+          "message": "contextual recall rejected or unavailable",
+          "category": "invalidInput",
+          "retryable": false,
+          "correlationId": "elegy-memory-18796-1792725607176289100",
+          "details": null,
+          "cause": null
+        }
+      },
+      "stderr": ""
+    }
+  },
+  "completedAt": "2026-10-23T03:20:07.668374+00:00",
+  "mappings": {
+    "release": {
+      "id": "3eb16534-9f72-4620-b006-39b0dbc9bcf7",
+      "text": "Lumen release approval belongs to ROLE_KITE; required preflight is CHECK_DELTA.",
+      "agent": "qual-a",
+      "deleted": false
+    },
+    "other": {
+      "id": "5b709747-65be-4c4a-8a96-373658f691c8",
+      "text": "Lumen-Lab release approval belongs to ROLE_SAND; required preflight is CHECK_WAVE.",
+      "agent": "qual-a",
+      "deleted": false
+    }
+  }
+}

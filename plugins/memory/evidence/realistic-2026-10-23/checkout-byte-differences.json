@@ -1,0 +1,108 @@
+{
+  "schemaVersion": "memory-checkout-byte-diff/v1",
+  "sourceRevision": "619f5dd705e6383a12b7d806369633df291fc1a3",
+  "sameGitContent": true,
+  "differingRawFiles": [
+    {
+      "path": "hosts/memory-mcp/src/memory_tools/redaction.rs",
+      "isolatedSha256": "9825bcdf53f398770827e35c647ebfcedc59dc04fa2e074a8f2be7c371974be4",
+      "mainCheckoutSha256": "24129f1070f94ccfc304b4dae76ac27b9b3df8ae14044555100685de0014f2d2"
+    },
+    {
+      "path": "hosts/memory-mcp/src/stdio_main.rs",
+      "isolatedSha256": "20282a4d16108939c7c1ed900967d734d32eac04ce3817cc03f6dfacd66423bc",
+      "mainCheckoutSha256": "706b8a2c7423a5248ab24a9bfa918a03b4f17ecd50d49380e970fd8c203c6a1e"
+    },
+    {
+      "path": "hosts/memory-mcp/tests/concurrency.rs",
+      "isolatedSha256": "1492f8e4380a78b30d5e2b2ae113cca4b7075c3cc0fa6ff9e0d54ee71dd7a447",
+      "mainCheckoutSha256": "de72e06007481b94f7a8e5e2e7d39e6db1eb75fad77c7ea438eec2444bd7172a"
+    },
+    {
+      "path": "hosts/memory-mcp/tests/error_paths.rs",
+      "isolatedSha256": "9c60c6a62ba37aa2b06cf1bc7df79c423aac2a857043075d714b9ce64f48160f",
+      "mainCheckoutSha256": "4e85f4a7a77465cb54b20b74d1ae4db50980b21e68379ee11be9d190a5256068"
+    },
+    {
+      "path": "hosts/memory-mcp/tests/large_corpus_bench.rs",
+      "isolatedSha256": "7fc7b35b714dd3a86c20396b2e0538f0e74c950c5b6c46a80c81d32f3ee33e8e",
+      "mainCheckoutSha256": "75dc494c198c2b5240703de18537ac0bea3670af4c941d7d31e7ef8824a4e058"
+    },
+    {
+      "path": "plugins/memory/eval-harness-v1.json",
+      "isolatedSha256": "fad9fcd06e129cc8c5b579b8ea1fe98e2d583cf0d4bf9152173985a1d061a3c1",
+      "mainCheckoutSha256": "929409d72af48aeda455fcef8b675e29de098760563cc546449b2a91e0637e9b"
+    },
+    {
+      "path": "plugins/memory/fixtures/eval/gate-decisions-v1.json",
+      "isolatedSha256": "2ff55f07bd43dc499f326e3b24067c74c29198fe03228053a0049d232937ecab",
+      "mainCheckoutSha256": "9ff83ad86bb5633c202381f3c6bd36ce7437068a7df2e310edeae9ca1665c1c7"
+    },
+    {
+      "path": "plugins/memory/fixtures/eval/golden-v1.json",
+      "isolatedSha256": "6da6c7b27d89de34d01edb41bb7a1c7f196532b1920ece06517a9094d2d23041",
+      "mainCheckoutSha256": "ac10075b8608084e32ea0a3fa67ffe4717dbd2ace5fb62239d9816da57fcc99e"
+    },
+    {
+      "path": "plugins/memory/src/embedding/circuit_breaker.rs",
+      "isolatedSha256": "563f34318f7bced700c65fd4f07cecf9289138c6a784d8a08fc84c77409cad1a",
+      "mainCheckoutSha256": "abbac1d5711b8a4ee6dbedd8c50b50e1be94d7c6b8d41a175025704c0558743b"
+    },
+    {
+      "path": "plugins/memory/src/eval/corpus.rs",
+      "isolatedSha256": "d87f23747474cb77dc767e10877283ca9bc970019b7ab66b5f7bd319ecb78a18",
+      "mainCheckoutSha256": "bb3eda4d4146fa19a066e4e153d11102c129372f3abdca3abe91511cb6644c83"
+    },
+    {
+      "path": "plugins/memory/src/eval/embedding.rs",
+      "isolatedSha256": "a8e51b58aec76c0f9f263d89fbd3e146b8a477f03e8127ec2b3b25b328172990",
+      "mainCheckoutSha256": "8e9949285011763838980affd113e0bc6d4d44fde35d812a45cda52fd4f35213"
+    },
+    {
+      "path": "plugins/memory/src/eval/gates.rs",
+      "isolatedSha256": "c517e8cb43a8e255495b06103add9f66ab1c4295e96949050d271a1df09b3c49",
+      "mainCheckoutSha256": "a6825771580cb691a492643d12270ee01dc565e5fb61d4960f43eb81677ce151"
+    },
+    {
+      "path": "plugins/memory/src/eval/metrics.rs",
+      "isolatedSha256": "95d5ace368f80fbf4c8f0e51b079febe1381694625c1af095c46988e63901da0",
+      "mainCheckoutSha256": "74cb8b2deb5a9c4f3f0673a53e0bc69491de3ee2aac9ad1ee9aac55ee416fb6d"
+    },
+    {
+      "path": "plugins/memory/src/eval/runner.rs",
+      "isolatedSha256": "9ce605c9c549ea199bfc634b121d8569203e6f3353ce59a96c07c4a34b82921a",
+      "mainCheckoutSha256": "7c2c4a8640e031019f0053d2976371f0bf3ad9d2f46d477dc613fc79874ff703"
+    },
+    {
+      "path": "plugins/memory/src/eval/synthetic.rs",
+      "isolatedSha256": "7bff0a56ce03bf35a4c14dfca041ee9fe790254309b7af395016dff8084ecf84",
+      "mainCheckoutSha256": "5e65116e684b94193f0cea3d35a85224770f156fbc907805fde465c881c6ec7d"
+    },
+    {
+      "path": "plugins/memory/src/forgetting.rs",
+      "isolatedSha256": "586c27630428a292c25e3d75dc0431190f40300449aa90695a7111b6ffb318cf",
+      "mainCheckoutSha256": "f08b290b8108b243a8b2fd5fee354d10e04e5e367146ea91333329afd3cb1c40"
+    },
+    {
+      "path": "plugins/memory/src/runtime.rs",
+      "isolatedSha256": "3fef972f87062ada3c1e45f6409b74263a135cf22beca3a3b21b6e8cbb9a31be",
+      "mainCheckoutSha256": "502fc52f0f548ae37242cde6aa88792614eeaee65ebc5e7648ca0e77f2ddbc69"
+    },
+    {
+      "path": "plugins/memory/tests/eval.rs",
+      "isolatedSha256": "3307c4659b11f0f9242eee5bae1e81bdfb2c899db0e2bde3ce81c88ee02f128f",
+      "mainCheckoutSha256": "7adbc43c20f5535205c6b5b6c32368a136250d210158c2f3ebf628430c3c2c00"
+    },
+    {
+      "path": "shared/sqlite-vec-init/Cargo.toml",
+      "isolatedSha256": "87dcdd597fa4c2533930ab558b907990c07d0245c63e1f9d15cfdb9532bdb5bb",
+      "mainCheckoutSha256": "b205191b9fa3b3f55ae155738cfc6c25c8c0b8bcc3ab60c4219ed76c615fca09"
+    },
+    {
+      "path": "shared/sqlite-vec-init/src/lib.rs",
+      "isolatedSha256": "cfe35041a8e98706ee2b5f34582373bc94b5f9d193f6e787a08f0dedd4a27c37",
+      "mainCheckoutSha256": "d91c009a5c5853bd5ee63baeb0824da38200b2c52779d4143cf7ad9e1a1956d1"
+    }
+  ],
+  "decision": "Build and qualify isolated source bytes; do not transfer receipts across differing source digests."
+}

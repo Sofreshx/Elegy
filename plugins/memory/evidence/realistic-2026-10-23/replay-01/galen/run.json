@@ -1,0 +1,1127 @@
+{
+  "schemaVersion": "memory-replay-episode/v1",
+  "id": "galen",
+  "startedAt": "2026-10-23T03:17:08.848292+00:00",
+  "status": "failed",
+  "stages": [],
+  "rpc": [
+    {
+      "client": "q13-write-endpoint-a",
+      "timestamp": "2026-10-23T03:17:09.269970+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 422.0
+    },
+    {
+      "client": "q13-write-endpoint-a",
+      "timestamp": "2026-10-23T03:17:09.269970+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q13-write-endpoint-a",
+      "timestamp": "2026-10-23T03:17:09.274462+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_store",
+          "arguments": {
+            "content": "Galen endpoint routing label is ENDPOINT_TULIP.",
+            "importance": 0.9,
+            "provenance": "user-stated"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"action\":\"added\",\"embeddingStatus\":\"skipped_no_provider\",\"gateResult\":\"accepted\",\"memory\":{\"content\":\"Galen endpoint routing label is ENDPOINT_TULIP.\",\"createdAt\":\"2026-10-23T03:17:09.272776+00:00\",\"id\":\"30ab9fb5-f102-4668-8d81-eb3b68a1f539\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:17:09.272776+00:00\"},\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "action": "added",
+            "embeddingStatus": "skipped_no_provider",
+            "gateResult": "accepted",
+            "memory": {
+              "content": "Galen endpoint routing label is ENDPOINT_TULIP.",
+              "createdAt": "2026-10-23T03:17:09.272776+00:00",
+              "id": "30ab9fb5-f102-4668-8d81-eb3b68a1f539",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:17:09.272776+00:00"
+            },
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q13-write-endpoint-a",
+      "timestamp": "2026-10-23T03:17:09.416316+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:17:08.868687Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "q13-write-endpoint-b",
+      "timestamp": "2026-10-23T03:17:09.450568+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 15.0
+    },
+    {
+      "client": "q13-write-endpoint-b",
+      "timestamp": "2026-10-23T03:17:09.450568+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q13-write-endpoint-b",
+      "timestamp": "2026-10-23T03:17:09.555316+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_store",
+          "arguments": {
+            "content": "Galen endpoint routing label is ENDPOINT_CROCUS.",
+            "importance": 0.9,
+            "provenance": "user-stated"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"action\":\"added\",\"embeddingStatus\":\"skipped_no_provider\",\"gateResult\":\"accepted\",\"memory\":{\"content\":\"Galen endpoint routing label is ENDPOINT_CROCUS.\",\"createdAt\":\"2026-10-23T03:17:09.453196100+00:00\",\"id\":\"2c2b1f57-5654-41af-a9a6-71a119221d03\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:17:09.453196100+00:00\"},\"namespace\":\"qual-b\"}"
+            }
+          ],
+          "structuredContent": {
+            "action": "added",
+            "embeddingStatus": "skipped_no_provider",
+            "gateResult": "accepted",
+            "memory": {
+              "content": "Galen endpoint routing label is ENDPOINT_CROCUS.",
+              "createdAt": "2026-10-23T03:17:09.453196100+00:00",
+              "id": "2c2b1f57-5654-41af-a9a6-71a119221d03",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:17:09.453196100+00:00"
+            },
+            "namespace": "qual-b"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 110.0
+    },
+    {
+      "client": "q13-write-endpoint-b",
+      "timestamp": "2026-10-23T03:17:09.682397+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:17:09.438160Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "q13-write-private-b",
+      "timestamp": "2026-10-23T03:17:09.717096+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 16.0
+    },
+    {
+      "client": "q13-write-private-b",
+      "timestamp": "2026-10-23T03:17:09.717096+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q13-write-private-b",
+      "timestamp": "2026-10-23T03:17:09.805838+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_store",
+          "arguments": {
+            "content": "Galen private audit code is SECRET_PEPPER_924.",
+            "importance": 0.9,
+            "provenance": "user-stated"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"action\":\"added\",\"embeddingStatus\":\"skipped_no_provider\",\"gateResult\":\"accepted\",\"memory\":{\"content\":\"Galen private audit code is SECRET_PEPPER_924.\",\"createdAt\":\"2026-10-23T03:17:09.719352900+00:00\",\"id\":\"11da640d-c957-4a58-97ba-20c4633c1452\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:17:09.719352900+00:00\"},\"namespace\":\"qual-b\"}"
+            }
+          ],
+          "structuredContent": {
+            "action": "added",
+            "embeddingStatus": "skipped_no_provider",
+            "gateResult": "accepted",
+            "memory": {
+              "content": "Galen private audit code is SECRET_PEPPER_924.",
+              "createdAt": "2026-10-23T03:17:09.719352900+00:00",
+              "id": "11da640d-c957-4a58-97ba-20c4633c1452",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:17:09.719352900+00:00"
+            },
+            "namespace": "qual-b"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 94.0
+    },
+    {
+      "client": "q13-write-private-b",
+      "timestamp": "2026-10-23T03:17:09.934074+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:17:09.701804Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "q13-fresh-mcp",
+      "timestamp": "2026-10-23T03:17:09.969730+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 32.0
+    },
+    {
+      "client": "q13-fresh-mcp",
+      "timestamp": "2026-10-23T03:17:09.970747+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q13-fresh-mcp",
+      "timestamp": "2026-10-23T03:17:09.973744+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_recall",
+          "arguments": {
+            "id": "30ab9fb5-f102-4668-8d81-eb3b68a1f539"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"found\":true,\"memory\":{\"content\":\"Galen endpoint routing label is ENDPOINT_TULIP.\",\"createdAt\":\"2026-10-23T03:17:09.272776+00:00\",\"id\":\"30ab9fb5-f102-4668-8d81-eb3b68a1f539\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:17:09.272776+00:00\"},\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "found": true,
+            "memory": {
+              "content": "Galen endpoint routing label is ENDPOINT_TULIP.",
+              "createdAt": "2026-10-23T03:17:09.272776+00:00",
+              "id": "30ab9fb5-f102-4668-8d81-eb3b68a1f539",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:17:09.272776+00:00"
+            },
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q13-fresh-mcp",
+      "timestamp": "2026-10-23T03:17:10.054214+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_search",
+          "arguments": {
+            "query": "Galen endpoint routing label is ENDPOINT_TULIP.",
+            "limit": 100
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":1,\"includeDormant\":false,\"namespace\":\"qual-a\",\"query\":\"Galen endpoint routing label is ENDPOINT_TULIP.\",\"results\":[{\"id\":\"30ab9fb5-f102-4668-8d81-eb3b68a1f539\",\"memoryType\":\"observation\",\"preview\":\"Galen endpoint routing label is ENDPOINT_TULIP.\",\"score\":1.0126420259475708,\"similarity\":1.0,\"state\":\"active\"}]}"
+            }
+          ],
+          "structuredContent": {
+            "count": 1,
+            "includeDormant": false,
+            "namespace": "qual-a",
+            "query": "Galen endpoint routing label is ENDPOINT_TULIP.",
+            "results": [
+              {
+                "id": "30ab9fb5-f102-4668-8d81-eb3b68a1f539",
+                "memoryType": "observation",
+                "preview": "Galen endpoint routing label is ENDPOINT_TULIP.",
+                "score": 1.0126420259475708,
+                "similarity": 1.0,
+                "state": "active"
+              }
+            ]
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 78.0
+    },
+    {
+      "client": "q13-fresh-mcp",
+      "timestamp": "2026-10-23T03:17:10.055233+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 4,
+        "params": {
+          "name": "memory_recall",
+          "arguments": {
+            "id": "2c2b1f57-5654-41af-a9a6-71a119221d03"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"found\":false,\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "found": false,
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q13-fresh-mcp",
+      "timestamp": "2026-10-23T03:17:10.059225+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 5,
+        "params": {
+          "name": "memory_search",
+          "arguments": {
+            "query": "Galen endpoint routing label is ENDPOINT_CROCUS.",
+            "limit": 100
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":false,\"namespace\":\"qual-a\",\"query\":\"Galen endpoint routing label is ENDPOINT_CROCUS.\",\"results\":[]}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": false,
+            "namespace": "qual-a",
+            "query": "Galen endpoint routing label is ENDPOINT_CROCUS.",
+            "results": []
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q13-fresh-mcp",
+      "timestamp": "2026-10-23T03:17:10.061765+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 6,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":1,\"includeDormant\":true,\"memories\":[{\"id\":\"30ab9fb5-f102-4668-8d81-eb3b68a1f539\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"preview\":\"Galen endpoint routing label is ENDPOINT_TULIP.\",\"provenance\":\"user-stated\",\"state\":\"active\",\"updatedAt\":\"2026-10-23T03:17:09.272776+00:00\"}],\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 1,
+            "includeDormant": true,
+            "memories": [
+              {
+                "id": "30ab9fb5-f102-4668-8d81-eb3b68a1f539",
+                "importance": 0.8999999761581421,
+                "memoryType": "observation",
+                "preview": "Galen endpoint routing label is ENDPOINT_TULIP.",
+                "provenance": "user-stated",
+                "state": "active",
+                "updatedAt": "2026-10-23T03:17:09.272776+00:00"
+              }
+            ],
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 15.0
+    },
+    {
+      "client": "q13-fresh-mcp",
+      "timestamp": "2026-10-23T03:17:10.063269+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 7,
+        "params": {
+          "name": "memory_recall",
+          "arguments": {
+            "id": "11da640d-c957-4a58-97ba-20c4633c1452"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"found\":false,\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "found": false,
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q13-fresh-mcp",
+      "timestamp": "2026-10-23T03:17:10.066877+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 8,
+        "params": {
+          "name": "memory_search",
+          "arguments": {
+            "query": "Galen private audit code is SECRET_PEPPER_924.",
+            "limit": 100
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":false,\"namespace\":\"qual-a\",\"query\":\"Galen private audit code is SECRET_PEPPER_924.\",\"results\":[]}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": false,
+            "namespace": "qual-a",
+            "query": "Galen private audit code is SECRET_PEPPER_924.",
+            "results": []
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q13-fresh-mcp",
+      "timestamp": "2026-10-23T03:17:10.068840+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 9,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":1,\"includeDormant\":true,\"memories\":[{\"id\":\"30ab9fb5-f102-4668-8d81-eb3b68a1f539\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"preview\":\"Galen endpoint routing label is ENDPOINT_TULIP.\",\"provenance\":\"user-stated\",\"state\":\"active\",\"updatedAt\":\"2026-10-23T03:17:09.272776+00:00\"}],\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 1,
+            "includeDormant": true,
+            "memories": [
+              {
+                "id": "30ab9fb5-f102-4668-8d81-eb3b68a1f539",
+                "importance": 0.8999999761581421,
+                "memoryType": "observation",
+                "preview": "Galen endpoint routing label is ENDPOINT_TULIP.",
+                "provenance": "user-stated",
+                "state": "active",
+                "updatedAt": "2026-10-23T03:17:09.272776+00:00"
+              }
+            ],
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q13-fresh-mcp",
+      "timestamp": "2026-10-23T03:17:10.189586+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:17:09.953048Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "galen-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:17:10.308385+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 31.0
+    },
+    {
+      "client": "galen-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:17:10.308385+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "galen-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:17:10.311373+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":1,\"includeDormant\":true,\"memories\":[{\"id\":\"30ab9fb5-f102-4668-8d81-eb3b68a1f539\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"preview\":\"Galen endpoint routing label is ENDPOINT_TULIP.\",\"provenance\":\"user-stated\",\"state\":\"active\",\"updatedAt\":\"2026-10-23T03:17:09.272776+00:00\"}],\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 1,
+            "includeDormant": true,
+            "memories": [
+              {
+                "id": "30ab9fb5-f102-4668-8d81-eb3b68a1f539",
+                "importance": 0.8999999761581421,
+                "memoryType": "observation",
+                "preview": "Galen endpoint routing label is ENDPOINT_TULIP.",
+                "provenance": "user-stated",
+                "state": "active",
+                "updatedAt": "2026-10-23T03:17:09.272776+00:00"
+              }
+            ],
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "galen-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:17:10.378792+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_delete",
+          "arguments": {
+            "id": "30ab9fb5-f102-4668-8d81-eb3b68a1f539"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"deleted\":true,\"id\":\"30ab9fb5-f102-4668-8d81-eb3b68a1f539\",\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "deleted": true,
+            "id": "30ab9fb5-f102-4668-8d81-eb3b68a1f539",
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 78.0
+    },
+    {
+      "client": "galen-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:17:10.380803+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 4,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "galen-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:17:10.496772+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:17:10.294257Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "galen-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:17:10.528823+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 16.0
+    },
+    {
+      "client": "galen-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:17:10.528823+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "galen-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:17:10.534419+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":2,\"includeDormant\":true,\"memories\":[{\"id\":\"11da640d-c957-4a58-97ba-20c4633c1452\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"preview\":\"Galen private audit code is SECRET_PEPPER_924.\",\"provenance\":\"user-stated\",\"state\":\"active\",\"updatedAt\":\"2026-10-23T03:17:09.719352900+00:00\"},{\"id\":\"2c2b1f57-5654-41af-a9a6-71a119221d03\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"preview\":\"Galen endpoint routing label is ENDPOINT_CROCUS.\",\"provenance\":\"user-stated\",\"state\":\"active\",\"updatedAt\":\"2026-10-23T03:17:09.453196100+00:00\"}],\"namespace\":\"qual-b\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 2,
+            "includeDormant": true,
+            "memories": [
+              {
+                "id": "11da640d-c957-4a58-97ba-20c4633c1452",
+                "importance": 0.8999999761581421,
+                "memoryType": "observation",
+                "preview": "Galen private audit code is SECRET_PEPPER_924.",
+                "provenance": "user-stated",
+                "state": "active",
+                "updatedAt": "2026-10-23T03:17:09.719352900+00:00"
+              },
+              {
+                "id": "2c2b1f57-5654-41af-a9a6-71a119221d03",
+                "importance": 0.8999999761581421,
+                "memoryType": "observation",
+                "preview": "Galen endpoint routing label is ENDPOINT_CROCUS.",
+                "provenance": "user-stated",
+                "state": "active",
+                "updatedAt": "2026-10-23T03:17:09.453196100+00:00"
+              }
+            ],
+            "namespace": "qual-b"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 15.0
+    },
+    {
+      "client": "galen-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:17:10.620582+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_delete",
+          "arguments": {
+            "id": "11da640d-c957-4a58-97ba-20c4633c1452"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"deleted\":true,\"id\":\"11da640d-c957-4a58-97ba-20c4633c1452\",\"namespace\":\"qual-b\"}"
+            }
+          ],
+          "structuredContent": {
+            "deleted": true,
+            "id": "11da640d-c957-4a58-97ba-20c4633c1452",
+            "namespace": "qual-b"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 78.0
+    },
+    {
+      "client": "galen-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:17:10.622591+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 4,
+        "params": {
+          "name": "memory_delete",
+          "arguments": {
+            "id": "2c2b1f57-5654-41af-a9a6-71a119221d03"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"deleted\":true,\"id\":\"2c2b1f57-5654-41af-a9a6-71a119221d03\",\"namespace\":\"qual-b\"}"
+            }
+          ],
+          "structuredContent": {
+            "deleted": true,
+            "id": "2c2b1f57-5654-41af-a9a6-71a119221d03",
+            "namespace": "qual-b"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "galen-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:17:10.624593+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 5,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-b\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-b"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 16.0
+    },
+    {
+      "client": "galen-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:17:10.747631+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:17:10.516981Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    }
+  ],
+  "checks": [],
+  "cleanup": [
+    {
+      "agent": "qual-a",
+      "deletedIds": [
+        "30ab9fb5-f102-4668-8d81-eb3b68a1f539"
+      ],
+      "verifiedEmpty": true
+    },
+    {
+      "agent": "qual-b",
+      "deletedIds": [
+        "11da640d-c957-4a58-97ba-20c4633c1452",
+        "2c2b1f57-5654-41af-a9a6-71a119221d03"
+      ],
+      "verifiedEmpty": true
+    }
+  ],
+  "error": {
+    "type": "AssertionError",
+    "message": "Recall CLI failed"
+  },
+  "completedAt": "2026-10-23T03:17:10.747631+00:00",
+  "mappings": {
+    "endpoint-a": {
+      "id": "30ab9fb5-f102-4668-8d81-eb3b68a1f539",
+      "text": "Galen endpoint routing label is ENDPOINT_TULIP.",
+      "agent": "qual-a",
+      "deleted": false
+    },
+    "endpoint-b": {
+      "id": "2c2b1f57-5654-41af-a9a6-71a119221d03",
+      "text": "Galen endpoint routing label is ENDPOINT_CROCUS.",
+      "agent": "qual-b",
+      "deleted": false
+    },
+    "private-b": {
+      "id": "11da640d-c957-4a58-97ba-20c4633c1452",
+      "text": "Galen private audit code is SECRET_PEPPER_924.",
+      "agent": "qual-b",
+      "deleted": false
+    }
+  }
+}

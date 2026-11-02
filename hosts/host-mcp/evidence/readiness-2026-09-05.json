@@ -1,0 +1,7 @@
+{
+  "recordedAt": "2026-09-05",
+  "environment": "Windows workspace checkout",
+  "command": "cargo test -p elegy-descriptor -p elegy-host-mcp",
+  "result": "passed",
+  "scope": "Added shared/descriptor/tests/project_loading.rs covering the previously-untested DESC-CONFIG-002 zero-match branch. Added hosts/host-mcp/tests/stdio_bootstrap.rs, which spawns the real compiled elegy-run binary as an OS child process and speaks real MCP stdio to it against the actual repository root (not a fixture) and against a temporary descriptor-less project, exercising the fix for the elegy-planning MCP outage: initialize now completes and a diagnostic resource is served even when descriptor composition fails, instead of the process exiting before the handshake. Also covers --preflight and --version. Still not exercised: a real installed binary driven by an actual external MCP client (Claude Desktop, etc.)."
+}

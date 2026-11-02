@@ -58,6 +58,14 @@ complete per-operation audit coverage.
 Search may update retrieval metadata for authorized shared rows; it never
 reattributes their authorship. This is distinct from content mutation rights.
 
+The same authorization-before-ranking rule applies to the legacy private
+binding that includes unowned rows. SQL must select the configured actor's
+rows or unowned rows before a vector candidate cap or result limit. A large
+number of foreign vectors cannot hide authorized results, and retrieval
+metadata is updated only for the authorized page actually returned. Existing
+private read scopes and bound-row visibility are preserved; including unowned
+rows does not enable shared-agent configuration.
+
 Acceptance uses fictional databases only: two allowed actors can read each
 other while retaining attribution; an excluded actor, wider scope and
 foreign tenant/user bindings remain hidden; search cannot touch hidden rows; direct

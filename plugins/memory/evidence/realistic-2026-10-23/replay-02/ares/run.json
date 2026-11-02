@@ -1,0 +1,818 @@
+{
+  "schemaVersion": "memory-replay-episode/v1",
+  "id": "ares",
+  "startedAt": "2026-10-23T03:20:07.696184+00:00",
+  "status": "failed",
+  "stages": [],
+  "rpc": [
+    {
+      "client": "q07-write-backup",
+      "timestamp": "2026-10-23T03:20:07.992677+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 297.0
+    },
+    {
+      "client": "q07-write-backup",
+      "timestamp": "2026-10-23T03:20:07.992677+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q07-write-backup",
+      "timestamp": "2026-10-23T03:20:07.997690+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_store",
+          "arguments": {
+            "content": "Ares backup runbook uses BACKUP_COPAL with retention 17 days.",
+            "importance": 0.9,
+            "provenance": "user-stated"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"action\":\"added\",\"embeddingStatus\":\"skipped_no_provider\",\"gateResult\":\"accepted\",\"memory\":{\"content\":\"Ares backup runbook uses BACKUP_COPAL with retention 17 days.\",\"createdAt\":\"2026-10-23T03:20:07.995398500+00:00\",\"id\":\"aad5e4a9-d357-4e1e-8757-2d0d500af7f3\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:20:07.995398500+00:00\"},\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "action": "added",
+            "embeddingStatus": "skipped_no_provider",
+            "gateResult": "accepted",
+            "memory": {
+              "content": "Ares backup runbook uses BACKUP_COPAL with retention 17 days.",
+              "createdAt": "2026-10-23T03:20:07.995398500+00:00",
+              "id": "aad5e4a9-d357-4e1e-8757-2d0d500af7f3",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:20:07.995398500+00:00"
+            },
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q07-write-backup",
+      "timestamp": "2026-10-23T03:20:08.147803+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:07.714897Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "q07-write-archive",
+      "timestamp": "2026-10-23T03:20:08.178428+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 31.0
+    },
+    {
+      "client": "q07-write-archive",
+      "timestamp": "2026-10-23T03:20:08.178428+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q07-write-archive",
+      "timestamp": "2026-10-23T03:20:08.244923+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_store",
+          "arguments": {
+            "content": "Ares-Archive backup runbook uses BACKUP_BASALT with retention 43 days.",
+            "importance": 0.9,
+            "provenance": "user-stated"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"action\":\"added\",\"embeddingStatus\":\"skipped_no_provider\",\"gateResult\":\"accepted\",\"memory\":{\"content\":\"Ares-Archive backup runbook uses BACKUP_BASALT with retention 43 days.\",\"createdAt\":\"2026-10-23T03:20:08.180586300+00:00\",\"id\":\"b09eb944-b4c9-47b7-af9e-8c65a3bd156d\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:20:08.180586300+00:00\"},\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "action": "added",
+            "embeddingStatus": "skipped_no_provider",
+            "gateResult": "accepted",
+            "memory": {
+              "content": "Ares-Archive backup runbook uses BACKUP_BASALT with retention 43 days.",
+              "createdAt": "2026-10-23T03:20:08.180586300+00:00",
+              "id": "b09eb944-b4c9-47b7-af9e-8c65a3bd156d",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:20:08.180586300+00:00"
+            },
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 62.0
+    },
+    {
+      "client": "q07-write-archive",
+      "timestamp": "2026-10-23T03:20:08.403092+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:08.166209Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "q07-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:08.432396+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 16.0
+    },
+    {
+      "client": "q07-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:08.432396+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q07-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:08.435941+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_recall",
+          "arguments": {
+            "id": "aad5e4a9-d357-4e1e-8757-2d0d500af7f3"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"found\":true,\"memory\":{\"content\":\"Ares backup runbook uses BACKUP_COPAL with retention 17 days.\",\"createdAt\":\"2026-10-23T03:20:07.995398500+00:00\",\"id\":\"aad5e4a9-d357-4e1e-8757-2d0d500af7f3\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:20:07.995398500+00:00\"},\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "found": true,
+            "memory": {
+              "content": "Ares backup runbook uses BACKUP_COPAL with retention 17 days.",
+              "createdAt": "2026-10-23T03:20:07.995398500+00:00",
+              "id": "aad5e4a9-d357-4e1e-8757-2d0d500af7f3",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:20:07.995398500+00:00"
+            },
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q07-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:08.502706+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_search",
+          "arguments": {
+            "query": "Ares backup runbook uses BACKUP_COPAL with retention 17 days.",
+            "limit": 100
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":1,\"includeDormant\":false,\"namespace\":\"qual-a\",\"query\":\"Ares backup runbook uses BACKUP_COPAL with retention 17 days.\",\"results\":[{\"id\":\"aad5e4a9-d357-4e1e-8757-2d0d500af7f3\",\"memoryType\":\"observation\",\"preview\":\"Ares backup runbook uses BACKUP_COPAL with retention 17 days.\",\"score\":1.0126420259475708,\"similarity\":1.0,\"state\":\"active\"}]}"
+            }
+          ],
+          "structuredContent": {
+            "count": 1,
+            "includeDormant": false,
+            "namespace": "qual-a",
+            "query": "Ares backup runbook uses BACKUP_COPAL with retention 17 days.",
+            "results": [
+              {
+                "id": "aad5e4a9-d357-4e1e-8757-2d0d500af7f3",
+                "memoryType": "observation",
+                "preview": "Ares backup runbook uses BACKUP_COPAL with retention 17 days.",
+                "score": 1.0126420259475708,
+                "similarity": 1.0,
+                "state": "active"
+              }
+            ]
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 78.0
+    },
+    {
+      "client": "q07-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:08.620165+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:08.421588Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "ares-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:08.733093+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 16.0
+    },
+    {
+      "client": "ares-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:08.733093+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "ares-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:08.736637+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":2,\"includeDormant\":true,\"memories\":[{\"id\":\"b09eb944-b4c9-47b7-af9e-8c65a3bd156d\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"preview\":\"Ares-Archive backup runbook uses BACKUP_BASALT with retention 43 days.\",\"provenance\":\"user-stated\",\"state\":\"active\",\"updatedAt\":\"2026-10-23T03:20:08.180586300+00:00\"},{\"id\":\"aad5e4a9-d357-4e1e-8757-2d0d500af7f3\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"preview\":\"Ares backup runbook uses BACKUP_COPAL with retention 17 days.\",\"provenance\":\"user-stated\",\"state\":\"active\",\"updatedAt\":\"2026-10-23T03:20:07.995398500+00:00\"}],\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 2,
+            "includeDormant": true,
+            "memories": [
+              {
+                "id": "b09eb944-b4c9-47b7-af9e-8c65a3bd156d",
+                "importance": 0.8999999761581421,
+                "memoryType": "observation",
+                "preview": "Ares-Archive backup runbook uses BACKUP_BASALT with retention 43 days.",
+                "provenance": "user-stated",
+                "state": "active",
+                "updatedAt": "2026-10-23T03:20:08.180586300+00:00"
+              },
+              {
+                "id": "aad5e4a9-d357-4e1e-8757-2d0d500af7f3",
+                "importance": 0.8999999761581421,
+                "memoryType": "observation",
+                "preview": "Ares backup runbook uses BACKUP_COPAL with retention 17 days.",
+                "provenance": "user-stated",
+                "state": "active",
+                "updatedAt": "2026-10-23T03:20:07.995398500+00:00"
+              }
+            ],
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 15.0
+    },
+    {
+      "client": "ares-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:08.785430+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_delete",
+          "arguments": {
+            "id": "b09eb944-b4c9-47b7-af9e-8c65a3bd156d"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"deleted\":true,\"id\":\"b09eb944-b4c9-47b7-af9e-8c65a3bd156d\",\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "deleted": true,
+            "id": "b09eb944-b4c9-47b7-af9e-8c65a3bd156d",
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 47.0
+    },
+    {
+      "client": "ares-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:08.788442+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 4,
+        "params": {
+          "name": "memory_delete",
+          "arguments": {
+            "id": "aad5e4a9-d357-4e1e-8757-2d0d500af7f3"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"deleted\":true,\"id\":\"aad5e4a9-d357-4e1e-8757-2d0d500af7f3\",\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "deleted": true,
+            "id": "aad5e4a9-d357-4e1e-8757-2d0d500af7f3",
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "ares-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:08.790052+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 5,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "ares-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:08.952877+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:08.721605Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "ares-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:08.990562+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 31.0
+    },
+    {
+      "client": "ares-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:08.990562+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "ares-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:08.992563+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-b\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-b"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "ares-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:08.994567+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-b\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-b"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "ares-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:09.002615+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:08.971797Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    }
+  ],
+  "checks": [],
+  "cleanup": [
+    {
+      "agent": "qual-a",
+      "deletedIds": [
+        "b09eb944-b4c9-47b7-af9e-8c65a3bd156d",
+        "aad5e4a9-d357-4e1e-8757-2d0d500af7f3"
+      ],
+      "verifiedEmpty": true
+    },
+    {
+      "agent": "qual-b",
+      "deletedIds": [],
+      "verifiedEmpty": true
+    }
+  ],
+  "error": {
+    "type": "AssertionError",
+    "message": "Recall CLI failed"
+  },
+  "failedStage": {
+    "caseId": "q07",
+    "actions": [
+      {
+        "key": "backup",
+        "op": "store",
+        "result": {
+          "action": "added",
+          "embeddingStatus": "skipped_no_provider",
+          "gateResult": "accepted",
+          "memory": {
+            "content": "Ares backup runbook uses BACKUP_COPAL with retention 17 days.",
+            "createdAt": "2026-10-23T03:20:07.995398500+00:00",
+            "id": "aad5e4a9-d357-4e1e-8757-2d0d500af7f3",
+            "importance": 0.8999999761581421,
+            "memoryType": "observation",
+            "provenance": "user-stated",
+            "reliability": 1.0,
+            "state": "active",
+            "tags": [],
+            "updatedAt": "2026-10-23T03:20:07.995398500+00:00"
+          },
+          "namespace": "qual-a"
+        }
+      },
+      {
+        "key": "archive",
+        "op": "store",
+        "result": {
+          "action": "added",
+          "embeddingStatus": "skipped_no_provider",
+          "gateResult": "accepted",
+          "memory": {
+            "content": "Ares-Archive backup runbook uses BACKUP_BASALT with retention 43 days.",
+            "createdAt": "2026-10-23T03:20:08.180586300+00:00",
+            "id": "b09eb944-b4c9-47b7-af9e-8c65a3bd156d",
+            "importance": 0.8999999761581421,
+            "memoryType": "observation",
+            "provenance": "user-stated",
+            "reliability": 1.0,
+            "state": "active",
+            "tags": [],
+            "updatedAt": "2026-10-23T03:20:08.180586300+00:00"
+          },
+          "namespace": "qual-a"
+        }
+      }
+    ],
+    "checks": [
+      {
+        "name": "fresh-mcp-id-and-search",
+        "passed": true
+      }
+    ],
+    "sessionId": "ares-q07-fresh",
+    "turnId": "q07",
+    "cliDiagnostic": {
+      "exitCode": 1,
+      "response": {
+        "schemaVersion": "elegy.cli/v1",
+        "correlationId": "elegy-memory-17932-1792725608680410500",
+        "nonInteractive": true,
+        "command": [
+          "contextual-recall"
+        ],
+        "status": "invalid",
+        "failure": {
+          "code": "CLI-INVALID-INPUT",
+          "message": "contextual recall rejected or unavailable",
+          "category": "invalidInput",
+          "retryable": false,
+          "correlationId": "elegy-memory-17932-1792725608680410500",
+          "details": null,
+          "cause": null
+        }
+      },
+      "stderr": ""
+    }
+  },
+  "completedAt": "2026-10-23T03:20:09.002615+00:00",
+  "mappings": {
+    "backup": {
+      "id": "aad5e4a9-d357-4e1e-8757-2d0d500af7f3",
+      "text": "Ares backup runbook uses BACKUP_COPAL with retention 17 days.",
+      "agent": "qual-a",
+      "deleted": false
+    },
+    "archive": {
+      "id": "b09eb944-b4c9-47b7-af9e-8c65a3bd156d",
+      "text": "Ares-Archive backup runbook uses BACKUP_BASALT with retention 43 days.",
+      "agent": "qual-a",
+      "deleted": false
+    }
+  }
+}

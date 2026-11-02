@@ -1,0 +1,378 @@
+{
+  "schemaVersion": "memory-realistic-answers/v1",
+  "startedAt": "2026-10-23T03:24:55.961106+00:00",
+  "status": "completed",
+  "model": "gpt-5.6-luna",
+  "reasoningEffort": "medium",
+  "configuration": {
+    "argv": [
+      "<codex>",
+      "exec",
+      "--ignore-user-config",
+      "--ephemeral",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "--json",
+      "-C",
+      "<scratch-case>",
+      "-m",
+      "gpt-5.6-luna",
+      "-c",
+      "model_reasoning_effort=\"medium\"",
+      "-c",
+      "project_doc_max_bytes=0",
+      "-"
+    ],
+    "executableSha256": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+    "environment": "API keys/endpoints/Memory bindings removed; existing ChatGPT login only"
+  },
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "codexSha256": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+  "codexVersion": "codex-cli 0.163.0-alpha.11",
+  "corpusSha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b",
+  "protocolSha256": "df253c5683deb07bac3b28f89bf80bbaef6fce21ea6a9086fed95f461e2acc4b",
+  "runnerSha256": "9bd417a00518bccc0d61e75908996e0bdc80b62db9a6b96e8e278f831994ae0b",
+  "ordinaryChatGPTAuth": true,
+  "paidApiCalls": 0,
+  "answers": [
+    {
+      "caseId": "q01",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 6359.414,
+      "issues": []
+    },
+    {
+      "caseId": "q01",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6225.867,
+      "issues": []
+    },
+    {
+      "caseId": "q02",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 10105.28,
+      "issues": []
+    },
+    {
+      "caseId": "q02",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6789.499,
+      "issues": []
+    },
+    {
+      "caseId": "q03",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 6608.968,
+      "issues": []
+    },
+    {
+      "caseId": "q03",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 7330.992,
+      "issues": []
+    },
+    {
+      "caseId": "q04",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 6206.519,
+      "issues": []
+    },
+    {
+      "caseId": "q04",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6038.508,
+      "issues": []
+    },
+    {
+      "caseId": "q05",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7351.456,
+      "issues": []
+    },
+    {
+      "caseId": "q05",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6158.413,
+      "issues": []
+    },
+    {
+      "caseId": "q06",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 6692.495,
+      "issues": []
+    },
+    {
+      "caseId": "q06",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 5642.673,
+      "issues": []
+    },
+    {
+      "caseId": "q07",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 5978.421,
+      "issues": []
+    },
+    {
+      "caseId": "q07",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 5872.676,
+      "issues": []
+    },
+    {
+      "caseId": "q08",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 10253.246,
+      "issues": []
+    },
+    {
+      "caseId": "q08",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6357.769,
+      "issues": []
+    },
+    {
+      "caseId": "q09",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7092.833,
+      "issues": []
+    },
+    {
+      "caseId": "q09",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 5848.631,
+      "issues": []
+    },
+    {
+      "caseId": "q10",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 6020.35,
+      "issues": []
+    },
+    {
+      "caseId": "q10",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 5834.734,
+      "issues": []
+    },
+    {
+      "caseId": "q11",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 5527.633,
+      "issues": []
+    },
+    {
+      "caseId": "q11",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6242.661,
+      "issues": []
+    },
+    {
+      "caseId": "q12",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 5918.742,
+      "issues": []
+    },
+    {
+      "caseId": "q12",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 5901.611,
+      "issues": []
+    },
+    {
+      "caseId": "q13",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 5800.306,
+      "issues": []
+    },
+    {
+      "caseId": "q13",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 9211.552,
+      "issues": []
+    },
+    {
+      "caseId": "q14",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 5997.109,
+      "issues": []
+    },
+    {
+      "caseId": "q14",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 5716.068,
+      "issues": []
+    },
+    {
+      "caseId": "q15",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 6111.793,
+      "issues": []
+    },
+    {
+      "caseId": "q15",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 5591.604,
+      "issues": []
+    },
+    {
+      "caseId": "q16",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 6051.443,
+      "issues": []
+    },
+    {
+      "caseId": "q16",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6107.045,
+      "issues": []
+    },
+    {
+      "caseId": "q17",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 6251.732,
+      "issues": []
+    },
+    {
+      "caseId": "q17",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 5862.594,
+      "issues": []
+    },
+    {
+      "caseId": "q18",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 5874.235,
+      "issues": []
+    },
+    {
+      "caseId": "q18",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6057.945,
+      "issues": []
+    },
+    {
+      "caseId": "q19",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 5912.679,
+      "issues": []
+    },
+    {
+      "caseId": "q19",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6055.37,
+      "issues": []
+    },
+    {
+      "caseId": "q20",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 6094.578,
+      "issues": []
+    },
+    {
+      "caseId": "q20",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6137.919,
+      "issues": []
+    },
+    {
+      "caseId": "q21",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 5589.265,
+      "issues": []
+    },
+    {
+      "caseId": "q21",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 5913.814,
+      "issues": []
+    },
+    {
+      "caseId": "q22",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 5816.407,
+      "issues": []
+    },
+    {
+      "caseId": "q22",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 5939.526,
+      "issues": []
+    },
+    {
+      "caseId": "q23",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7501.1,
+      "issues": []
+    },
+    {
+      "caseId": "q23",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6304.91,
+      "issues": []
+    },
+    {
+      "caseId": "q24",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7463.536,
+      "issues": []
+    },
+    {
+      "caseId": "q24",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 5792.19,
+      "issues": []
+    }
+  ],
+  "replayRunSha256": "c1a23d343b6a2d498fe5f82db17d5cba11ff07f5fc3cacce90d475beed8411c0",
+  "completedAt": "2026-10-23T03:26:42.284619+00:00"
+}

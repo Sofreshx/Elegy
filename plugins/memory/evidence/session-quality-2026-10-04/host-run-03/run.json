@@ -1,0 +1,78 @@
+{
+  "cleanup": {
+    "deleted": [
+      {
+        "agent": "qual-a",
+        "key": "qual-a:marker",
+        "result": {
+          "deleted": true,
+          "id": "a67a3bce-c4ba-4daa-b2f2-c559aca5b2b7",
+          "namespace": "qual-a"
+        }
+      }
+    ],
+    "errors": [],
+    "verifiedEmpty": {
+      "qual-a": true,
+      "qual-b": true
+    }
+  },
+  "createdAt": "2026-10-04T18:35:52.634827+00:00",
+  "executables": {
+    "codex": {
+      "path": "<local-path>\\AppData\\Local\\OpenAI\\Codex\\bin\\8aaf1547b825b104\\codex.EXE",
+      "sha256": "37762753b554982eef1c109303d1be652b6397f1479e844794353a85650199c6",
+      "version": {
+        "exitCode": 0,
+        "stderr": "",
+        "stdout": "codex-cli 0.160.0\n"
+      }
+    },
+    "memoryMcp": {
+      "path": "<local-path>\\.codex\\worktrees\\memory-qualification-oct04\\Elegy\\target\\debug\\elegy-memory-mcp-stdio.exe",
+      "sha256": "901361065cedcd54091f828a96f77768283e596ee980f18372eac86d13246eaf",
+      "version": {
+        "exitCode": 1,
+        "stderr": "{\"timestamp\":\"2026-10-04T18:35:56.717246Z\",\"level\":\"ERROR\",\"fields\":{\"message\":\"startup failed\",\"error\":\"loading stdio configuration: ELEGY_DB_PATH is required\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "stdout": ""
+      }
+    },
+    "opencode": {
+      "path": "<local-path>\\AppData\\Local\\Microsoft\\WinGet\\Packages\\SST.opencode_Microsoft.Winget.Source_8wekyb3d8bbwe\\opencode.EXE",
+      "sha256": "ea4f4d4bec95cd41baf0fc53adc4e34b31e1c8676dc5b2507c8797ab1884af18",
+      "version": {
+        "exitCode": 0,
+        "stderr": "",
+        "stdout": "1.18.21\n"
+      }
+    }
+  },
+  "mapping": {
+    "qual-a:marker": "qual-a:a67a3bce-c4ba-4daa-b2f2-c559aca5b2b7"
+  },
+  "model": {
+    "codex": "gpt-5.6-luna",
+    "opencode": "opencode/big-pickle"
+  },
+  "schemaVersion": "memory-host-session/v1",
+  "secondHost": "not-run: prior OpenCode provider 403 preserved in host-run-02",
+  "sessions": [
+    {
+      "agent": "qual-a",
+      "elapsedMs": 21579.0,
+      "exitCode": 0,
+      "host": "codex",
+      "index": 1,
+      "timedOut": false
+    },
+    {
+      "agent": "qual-a",
+      "elapsedMs": 18625.0,
+      "exitCode": 0,
+      "host": "codex",
+      "index": 2,
+      "timedOut": false
+    }
+  ],
+  "status": "completed"
+}

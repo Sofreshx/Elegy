@@ -155,3 +155,28 @@ consolidation, learning and forgetting never determine the open-claim inventory.
 The host or Planning owns scheduling and responsibility; this CLI adds no timer,
 provider cost or automatic MCP call. Readiness promotion still follows the
 [readiness contract](../../../docs/specs/readiness-v1.md).
+
+## Current integration and historical experiments
+
+The [production integration plan](../../../docs/plans/memory-production-closure-20261102.md)
+tracks the retained source changes, executable checks and publication state.
+The [4 October campaign](../evidence/session-quality-2026-10-04/README.md)
+and [23 October realistic campaign](../evidence/realistic-2026-10-23/README.md)
+are frozen historical observations. Their blocked second-host test and adverse
+answer-quality results remain visible; importing them does not requalify a
+later source version. Current Harbor/Harbor-Sandbox retrieval regressions are
+covered separately in `tests/contextual_recall.rs`. Correct selection does not
+guarantee that a model will use every retrieved fact or abstain correctly.
+
+A repeatable, provider-free library benchmark is available with:
+
+```text
+cargo test --release --locked -p elegy-memory --test recall_performance -- --ignored --nocapture
+```
+
+It seeds 1,005 synthetic rows, verifies the authorized expected result on every
+call, uses independent sessions, and reports p50/p95/max over 100 calls after
+five warmups. Setup is excluded; source bytes, WAL data and access counters
+must remain unchanged. The 500 ms p95 target is reported, not a timing-sensitive
+default test assertion. This lexical library measurement excludes process
+startup, embedding services, network, and model response time.

@@ -1,0 +1,43 @@
+{
+  "answer": "Le runbook et la durée de rétention prévus pour la sauvegarde Ares sont inconnus dans les informations disponibles.",
+  "threadId": "01a166ca-b2da-7fd1-aaa8-375233d48cf7",
+  "usage": {
+    "input_tokens": 20516,
+    "cached_input_tokens": 16384,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 29,
+    "reasoning_output_tokens": 0
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a166ca-b2da-7fd1-aaa8-375233d48cf7\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Le runbook et la durée de rétention prévus pour la sauvegarde Ares sont inconnus dans les informations disponibles.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20516,\"cached_input_tokens\":16384,\"cache_write_input_tokens\":0,\"output_tokens\":29,\"reasoning_output_tokens\":0}}\n",
+  "stderr": "2026-10-23T03:25:22.540949Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q07",
+  "arm": "without",
+  "startedAt": "2026-10-23T03:25:22.112402+00:00",
+  "completedAt": "2026-10-23T03:25:27.986074+00:00",
+  "elapsedMs": 5872.676,
+  "promptSha256": "7f8e319a25f00101d12d5393e362c8dfba02a8f637534387e341918b9e9cae43",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

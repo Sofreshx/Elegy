@@ -1,0 +1,43 @@
+{
+  "answer": "La durée du cache anti-rejeu des webhooks de paiement Harbor est inconnue. Le nom de la stratégie de déduplication n’est pas disponible dans les informations fournies.",
+  "threadId": "01a166cb-625d-7180-94b2-2e4512b50610",
+  "usage": {
+    "input_tokens": 20519,
+    "cached_input_tokens": 16384,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 71,
+    "reasoning_output_tokens": 29
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a166cb-625d-7180-94b2-2e4512b50610\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"La durée du cache anti-rejeu des webhooks de paiement Harbor est inconnue. Le nom de la stratégie de déduplication n’est pas disponible dans les informations fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20519,\"cached_input_tokens\":16384,\"cache_write_input_tokens\":0,\"output_tokens\":71,\"reasoning_output_tokens\":29}}\n",
+  "stderr": "2026-10-23T03:26:07.468038Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q16",
+  "arm": "without",
+  "startedAt": "2026-10-23T03:26:07.052732+00:00",
+  "completedAt": "2026-10-23T03:26:13.159127+00:00",
+  "elapsedMs": 6107.045,
+  "promptSha256": "825698771bdf23d829f6e651439e035dd2e049d668985cdd0f6521c85a2d3cbf",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

@@ -16,6 +16,9 @@ on:
       - 'rustfmt.toml'
       - 'deny.toml'
       - '.cargo/**'
+      - 'elegy.toml'
+      - 'elegy.resources.d/**'
+      - '.elegy/checks.json'
       - '.github/workflows/rust-ci.yml'
       - 'scripts/**'
       - '.elegy/docs.yaml'
@@ -41,6 +44,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  memory-helper-fixtures:
+    name: memory helpers (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Installer and executable receipt fixtures (Python 3.12+)
+        run: python -m unittest discover -s scripts/tests -p "test_*.py" -v
+      - name: Recall hook fixtures
+        run: python -m unittest discover -s plugins/memory/integrations/codex -p "test_*.py" -v
+      - name: Windows process supervision fixtures
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/tests/test_private_memory_tunnel.ps1
+
   fmt:
     name: fmt
     runs-on: ubuntu-latest
@@ -112,6 +134,13 @@ jobs:
       - name: cargo test --workspace --all-targets --all-features
         working-directory: .
         run: cargo test --workspace --all-targets --all-features --target ${{ matrix.target }}
+      - name: elegy-run preflight (repo root)
+        working-directory: .
+        # Mirrors .elegy/checks.json's elegy-run-preflight local check: fail
+        # loudly in CI if the repo root's own descriptor configuration ever
+        # breaks again, instead of only surfacing as a silent MCP disconnect
+        # loop in a downstream host.
+        run: cargo run --target ${{ matrix.target }} -p elegy-host-mcp --bin elegy-run -- --project . --preflight
 
   packaging-smoke:
     name: packaging smoke

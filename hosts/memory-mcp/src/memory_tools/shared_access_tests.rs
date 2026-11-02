@@ -651,3 +651,103 @@ async fn hidden_vector_pool_cannot_starve_shared_or_owned_results() {
     assert_eq!(matches.len(), 1);
     assert_eq!(matches[0].memory.id, own);
 }
+
+#[tokio::test]
+async fn legacy_private_search_returns_owned_and_unowned_past_hidden_vector_pool() {
+    let temp = TempDir::new().unwrap();
+    let repository = MemoryRepository::new_with_embedding_provider(
+        temp.path().join("memory.db"),
+        MemoryBinding::new("fictional-team", "agent-a")
+            .unwrap()
+            .including_unowned(true),
+        Arc::new(FixedEmbeddingProvider),
+    )
+    .unwrap();
+    let mut hidden_before = Vec::new();
+    for index in 0..1001 {
+        let hidden = seed(
+            &repository,
+            memory(&format!("unrelated hidden vector {index}"), "agent-c"),
+        )
+        .await;
+        repository
+            .store
+            .store_embedding(&hidden, &angled_embedding(0.99, 0.1))
+            .await
+            .unwrap();
+        hidden_before.push(repository.store.get_raw(&hidden).await.unwrap().unwrap());
+    }
+    let own = seed(&repository, memory("unrelated owned vector", "agent-a")).await;
+    repository
+        .store
+        .store_embedding(&own, &angled_embedding(0.8, 0.6))
+        .await
+        .unwrap();
+    let mut unowned = memory("unrelated unowned vector", "agent-a");
+    unowned.agent_id = None;
+    let unowned = seed(&repository, unowned).await;
+    repository
+        .store
+        .store_embedding(&unowned, &angled_embedding(0.7, 0.7))
+        .await
+        .unwrap();
+
+    let results = repository
+        .search(&args(
+            json!({"query": "quasar spectral retrieval", "limit": 2}),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(results.len(), 2);
+    assert!(results.iter().any(|row| row.memory.id == own));
+    assert!(results.iter().any(|row| row.memory.id == unowned));
+    for before in hidden_before {
+        let after = repository.store.get_raw(&before.id).await.unwrap().unwrap();
+        assert_eq!(
+            serde_json::to_value(before).unwrap(),
+            serde_json::to_value(after).unwrap()
+        );
+    }
+}
+
+#[tokio::test]
+async fn legacy_private_search_tracks_only_the_returned_page() {
+    let temp = TempDir::new().unwrap();
+    let repository = MemoryRepository::new(
+        temp.path().join("memory.db"),
+        MemoryBinding::new("fictional-team", "agent-a")
+            .unwrap()
+            .including_unowned(true),
+    )
+    .unwrap();
+    let own = seed(&repository, memory("quasar owned first", "agent-a")).await;
+    let mut unowned = memory("quasar unowned second", "agent-a");
+    unowned.agent_id = None;
+    let unowned = seed(&repository, unowned).await;
+    let foreign = seed(&repository, memory("quasar foreign decoy", "agent-c")).await;
+    let mut before_rows = Vec::new();
+    for id in [own, unowned, foreign] {
+        before_rows.push(repository.store.get_raw(&id).await.unwrap().unwrap());
+    }
+
+    let results = repository
+        .search(&args(json!({"query": "quasar", "limit": 1})))
+        .await
+        .unwrap();
+
+    assert_eq!(results.len(), 1);
+    assert!([own, unowned].contains(&results[0].memory.id));
+    for before in before_rows {
+        let after = repository.store.get_raw(&before.id).await.unwrap().unwrap();
+        if before.id == results[0].memory.id {
+            assert_eq!(after.access_count, before.access_count + 1);
+            assert!(after.last_accessed_at.is_some());
+        } else {
+            assert_eq!(
+                serde_json::to_value(before).unwrap(),
+                serde_json::to_value(after).unwrap()
+            );
+        }
+    }
+}
