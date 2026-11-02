@@ -50,6 +50,38 @@
       "promotionState": "advisory",
       "owner": null
     },
+    "elegy-run-preflight": {
+      "enabled": true,
+      "group": "commit",
+      "description": "Resolve and compose the repo-root elegy.toml project the same way the elegy-run MCP host does at startup, and fail if descriptor loading breaks",
+      "cwd": ".",
+      "timeoutMs": 120000,
+      "blocking": true,
+      "required": true,
+      "skippable": false,
+      "requiresReasonOnSkip": false,
+      "defaultProfiles": [
+        "commit"
+      ],
+      "cost": "medium",
+      "opensWindow": false,
+      "ciWorkflow": null,
+      "ciJob": null,
+      "ciRequired": false,
+      "commands": [
+        "cargo run -p elegy-host-mcp --bin elegy-run -- --project . --preflight"
+      ],
+      "gateStrength": "blocking",
+      "determinism": "deterministic-runnable",
+      "sourcePack": "rust",
+      "tags": [
+        "rust",
+        "mcp"
+      ],
+      "severity": "error",
+      "promotionState": "enforced",
+      "owner": null
+    },
     "npm-audit-advisory": {
       "enabled": true,
       "group": "security",

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "memory-final-provider-free-clean-head/v1",
+  "boundAt": "2026-11-02T13:59:28.273392+00:00",
+  "explicitRootGo": true,
+  "sourceRevision": "5c246906c7edf7fb876901b610d1de8352307715",
+  "trackedAndUntrackedWorktreeClean": true,
+  "predeclarationSha256": "e7783455f503483ee613eab896b773b8d8e62997d26979e17169dbb8a938c2bb",
+  "orchestratorSha256": "0fe614d9ae5c6bb5ea014040262aa248769298a8b6e6b95348ef091fe0d31f7d",
+  "freeze": "Root holds tracked files, untracked worktree additions, Cargo, scans and exports through final end capture; ignored QA scratch only.",
+  "providerFree": true,
+  "cargoOffline": true,
+  "priorRollbackValidationReportedByRoot": {
+    "passed": 499,
+    "failed": 0,
+    "ignored": 1,
+    "clippy": "pass",
+    "fmt": "pass",
+    "summarySha256": "c7c905643f7954b4b7b6b0b6032aff3b7777b62b1e6c4222ff5121c7d70a7c41"
+  }
+}

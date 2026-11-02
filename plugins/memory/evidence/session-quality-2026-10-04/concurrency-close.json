@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "memory-concurrency-close/v1",
+  "observedAt": "2026-10-04T19:09:18.632081+00:00",
+  "originalCheckout": {
+    "branch": "codex/memory-developer-experience",
+    "head": "e0ef29d3532023c1905f2df1c86446d3b29f3cd5",
+    "workingTreeClean": true
+  },
+  "otherTaskObservedActive": true,
+  "qualifiedSource": "acc6b4e22625841ce0fdde55226472cd416728f1",
+  "changedPathsSinceQualifiedSource": [
+    "plugins/memory/AGENTS.md",
+    "plugins/memory/CONTRIBUTING.md",
+    "plugins/memory/README.md",
+    "plugins/memory/docs/architecture/ARCHITECTURE.md",
+    "plugins/memory/docs/architecture/memory-model.md",
+    "plugins/memory/docs/architecture/migration-framework.md",
+    "plugins/memory/docs/architecture/mvp-scope.md",
+    "plugins/memory/docs/architecture/storage-schema.md",
+    "plugins/memory/docs/architecture/traits-and-interfaces.md",
+    "plugins/memory/docs/qualification.md",
+    "plugins/memory/skills/elegy-memory/SKILL.md",
+    "plugins/memory/src/artifacts.rs",
+    "plugins/memory/src/cli.rs",
+    "plugins/memory/src/cli/tests.rs",
+    "plugins/memory/src/gate.rs",
+    "plugins/memory/src/gate/tests.rs",
+    "plugins/memory/src/lib.rs",
+    "plugins/memory/src/storage/schema.rs",
+    "plugins/memory/src/storage/schema/tests.rs",
+    "plugins/memory/src/storage/sqlite_store.rs",
+    "plugins/memory/src/storage/sqlite_store/tests.rs"
+  ],
+  "limit": "Concurrent refactor was not incorporated or qualified by this experiment; no inherited validity for its changed source fingerprint. No message sent to the other task."
+}

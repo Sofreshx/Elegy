@@ -1,5 +1,9 @@
 mod redaction;
 
+#[cfg(test)]
+#[path = "memory_tools/shared_access_tests.rs"]
+mod shared_access_tests;
+
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -119,25 +123,29 @@ impl MemoryRepository {
             return Ok(Vec::new());
         }
 
-        // Unowned rows cannot be expressed as an `agent_id` equality filter, so
-        // that dimension moves to `is_visible_memory` and ranking runs
-        // untruncated. The store scores every candidate before truncating and
-        // the MCP never sets a context budget, so over-fetching is free here.
-        let owned_only = !self.binding.include_unowned();
-        let matches = self
-            .store
-            .search(SearchQuery {
-                text: query.to_string(),
-                embedding: None,
-                scope: self.binding.read_scope(),
-                state_filter: args.state_filter(),
-                type_filter: args.memory_types.clone().map(tool_memory_types),
-                max_results: if owned_only { args.limit() } else { usize::MAX },
-                context_config: None,
-                session_id: None,
-                agent_id: owned_only.then(|| self.agent_id_owned()),
-            })
-            .await?;
+        let owned_only = !self.binding.include_unowned() && self.binding.shared_agents().is_none();
+        let query = SearchQuery {
+            text: query.to_string(),
+            embedding: None,
+            scope: self.binding.read_scope(),
+            state_filter: args.state_filter(),
+            type_filter: args.memory_types.clone().map(tool_memory_types),
+            max_results: args.limit(),
+            context_config: None,
+            session_id: None,
+            agent_id: owned_only.then(|| self.agent_id_owned()),
+        };
+        let matches = if let Some(shared) = self.binding.shared_agents() {
+            self.store
+                .search_shared_agents(query, self.agent_id(), shared)
+                .await?
+        } else if self.binding.include_unowned() {
+            self.store
+                .search_agent_and_unowned(query, self.agent_id())
+                .await?
+        } else {
+            self.store.search(query).await?
+        };
 
         Ok(matches
             .into_iter()
@@ -247,7 +255,7 @@ impl MemoryRepository {
         let candidate = args.to_candidate()?;
         let gate = DefaultSalienceGate::new(self.store.scope_config()?);
         let decision = gate
-            .evaluate(&candidate, &self.store)
+            .evaluate(&candidate, &self.store.gate_view_for_agent(self.agent_id()))
             .await
             .map_err(map_gate_error)?;
 
@@ -257,11 +265,12 @@ impl MemoryRepository {
                 enriched_content,
                 promote_to: _,
             } => {
+                self.require_writable_memory(&target_id).await?;
                 self.store
                     .update_content(
                         &target_id,
                         &enriched_content,
-                        "mcp:memory_store",
+                        &format!("agent:{}", self.agent_id()),
                         "merged by salience gate from MCP memory_store",
                     )
                     .await?;
@@ -277,6 +286,7 @@ impl MemoryRepository {
                 conflicting_id,
                 description,
             } => {
+                self.require_writable_memory(&conflicting_id).await?;
                 let memory = self.build_memory_from_candidate(&candidate, MemoryState::Active);
                 let id = memory.id;
                 self.store.store(memory).await?;
@@ -338,7 +348,7 @@ impl MemoryRepository {
         let content = require_non_empty_text("content", &args.content)?;
         let reason = normalized_reason(args.reason.as_deref(), "updated via MCP memory_update");
         self.store
-            .update_content(&id, content, "mcp:memory_update", &reason)
+            .update_content(&id, content, &format!("agent:{}", self.agent_id()), &reason)
             .await?;
         let memory = self.require_writable_memory(&id).await?;
         Ok(MemoryUpdateResponse {
@@ -354,7 +364,10 @@ impl MemoryRepository {
     ) -> Result<MemoryConsolidateResponse, StoreError> {
         let candidates = self
             .store
-            .list_consolidation_candidates(&[MemoryScope::Agent], None)?;
+            .list_consolidation_candidates(&[MemoryScope::Agent], None)?
+            .into_iter()
+            .filter(|candidate| self.is_writable_memory(&candidate.memory))
+            .collect::<Vec<_>>();
 
         let pair_limit = args.limit.map(|l| l as usize);
         let cross_scope = args.cross_scope.unwrap_or(false);
@@ -386,7 +399,7 @@ impl MemoryRepository {
                             .update_content(
                                 &result.id,
                                 &result.content,
-                                "mcp:memory_consolidate",
+                                &format!("agent:{}", self.agent_id()),
                                 "consolidated duplicate memories",
                             )
                             .await?;
@@ -456,9 +469,13 @@ impl MemoryRepository {
             .as_deref()
             .map(str::trim)
             .filter(|value| !value.is_empty());
-        let correction = self
-            .store
-            .correct_memory(&id, content, "mcp:memory_correct", reason)?;
+        let correction = self.store.correct_memory_for_agent(
+            &id,
+            content,
+            &format!("agent:{}", self.agent_id()),
+            reason,
+            self.agent_id(),
+        )?;
         let memory = self.require_writable_memory(&id).await?;
         Ok(MemoryCorrectResponse {
             namespace: self.namespace_owned(),
@@ -478,7 +495,7 @@ impl MemoryRepository {
         // `is_visible_memory` still removes rows afterwards; truncating early
         // would under-return.
         let scopes = self.binding.read_scope().visible_scopes();
-        let owned_only = !self.binding.include_unowned();
+        let owned_only = !self.binding.include_unowned() && self.binding.shared_agents().is_none();
         let merge_needed = scopes.len() > 1 || !owned_only;
 
         let mut memories = Vec::new();
@@ -519,6 +536,12 @@ impl MemoryRepository {
     }
 
     fn is_visible_memory(&self, memory: &Memory) -> bool {
+        if self.binding.shared_agents().is_some()
+            && memory.agent_id.as_deref() != Some(self.agent_id())
+            && (memory.tenant_id.is_some() || memory.user_id.is_some())
+        {
+            return false;
+        }
         self.binding
             .read_scope()
             .visible_scopes()
@@ -532,9 +555,22 @@ impl MemoryRepository {
     /// are shared local knowledge rather than another agent's private state.
     fn is_readable_owner(&self, memory: &Memory) -> bool {
         match memory.agent_id.as_deref() {
-            Some(agent_id) => agent_id == self.agent_id(),
-            None => self.binding.include_unowned(),
+            Some(agent_id) => {
+                agent_id == self.agent_id()
+                    || (memory.scope == MemoryScope::Agent
+                        && self
+                            .binding
+                            .shared_agents()
+                            .is_some_and(|agents| agents.iter().any(|id| id == agent_id)))
+            }
+            None => self.binding.shared_agents().is_none() && self.binding.include_unowned(),
         }
+    }
+
+    fn is_writable_memory(&self, memory: &Memory) -> bool {
+        memory.scope == MemoryScope::Agent
+            && memory.agent_id.as_deref() == Some(self.agent_id())
+            && memory.state != MemoryState::Deleted
     }
 
     fn build_memory_from_candidate(
@@ -594,6 +630,9 @@ impl MemoryRepository {
                 "memory {id} is readable in the {:?} scope but this connector only writes agent-scoped memories",
                 memory.scope
             )));
+        }
+        if !self.is_writable_memory(&memory) {
+            return Err(StoreError::NotFound(*id));
         }
         Ok(memory)
     }
@@ -873,6 +912,7 @@ impl MemorySearchResponse {
 #[serde(rename_all = "camelCase")]
 pub struct SearchResultRow {
     pub id: String,
+    pub agent_id: Option<String>,
     pub score: f32,
     pub similarity: f32,
     pub state: String,
@@ -884,6 +924,7 @@ impl From<MemorySearchMatch> for SearchResultRow {
     fn from(value: MemorySearchMatch) -> Self {
         Self {
             id: value.memory.id.to_string(),
+            agent_id: value.memory.agent_id,
             score: value.score,
             similarity: value.similarity,
             state: display_memory_state(value.memory.state),
@@ -940,6 +981,7 @@ impl MemoryListResponse {
 #[serde(rename_all = "camelCase")]
 pub struct ListRow {
     pub id: String,
+    pub agent_id: Option<String>,
     pub state: String,
     pub memory_type: String,
     pub provenance: String,
@@ -952,6 +994,7 @@ impl From<Memory> for ListRow {
     fn from(value: Memory) -> Self {
         Self {
             id: value.id.to_string(),
+            agent_id: value.agent_id,
             state: display_memory_state(value.state),
             memory_type: display_memory_type(value.memory_type),
             provenance: display_provenance(value.provenance),
@@ -966,6 +1009,7 @@ impl From<Memory> for ListRow {
 #[serde(rename_all = "camelCase")]
 pub struct MemoryDetail {
     pub id: String,
+    pub agent_id: Option<String>,
     pub content: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
@@ -987,6 +1031,7 @@ impl From<Memory> for MemoryDetail {
     fn from(value: Memory) -> Self {
         Self {
             id: value.id.to_string(),
+            agent_id: value.agent_id,
             content: value.content,
             summary: value.summary,
             state: display_memory_state(value.state),
@@ -1372,6 +1417,7 @@ pub struct MemoryBinding {
     agent_id: String,
     read_scope: MemoryScope,
     include_unowned: bool,
+    shared_agents: Option<Vec<String>>,
 }
 
 impl Default for MemoryBinding {
@@ -1381,6 +1427,7 @@ impl Default for MemoryBinding {
             agent_id: DEFAULT_AGENT_ID.to_string(),
             read_scope: MemoryScope::Agent,
             include_unowned: false,
+            shared_agents: None,
         }
     }
 }
@@ -1427,6 +1474,29 @@ impl MemoryBinding {
         self
     }
 
+    /// Explicit host-owned sharing. The namespace labels this database/owner
+    /// group; it is not an additional row partition or upstream authentication.
+    pub fn with_shared_agents(mut self, agents: Vec<String>) -> Result<Self, MemoryBindingError> {
+        let mut normalized = Vec::new();
+        for agent in agents {
+            let agent = agent.trim().to_string();
+            if agent.is_empty() || normalized.contains(&agent) {
+                return Err(MemoryBindingError::InvalidSharedAgents);
+            }
+            normalized.push(agent);
+        }
+        if normalized.is_empty() || !normalized.contains(&self.agent_id) {
+            return Err(MemoryBindingError::InvalidSharedAgents);
+        }
+        self.shared_agents = Some(normalized);
+        self.include_unowned = false;
+        Ok(self)
+    }
+
+    pub fn shared_agents(&self) -> Option<&[String]> {
+        self.shared_agents.as_deref()
+    }
+
     pub fn namespace(&self) -> &str {
         &self.namespace
     }
@@ -1446,6 +1516,8 @@ impl MemoryBinding {
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum MemoryBindingError {
+    #[error("shared agent IDs must be nonempty, distinct and include the configured caller")]
+    InvalidSharedAgents,
     #[error("memory namespace must not be empty")]
     EmptyNamespace,
     #[error("memory agent_id must not be empty")]

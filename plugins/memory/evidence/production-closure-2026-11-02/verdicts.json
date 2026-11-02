@@ -1,0 +1,163 @@
+{
+  "schemaVersion": "memory-realistic-acceptance/v1",
+  "status": "blocked",
+  "executionErrors": [],
+  "criticalAnswerErrors": [
+    {
+      "caseId": "q09",
+      "forbiddenMentions": [
+        "BACKUP_COPAL"
+      ],
+      "actual": "L’identifiant précis à restaurer est `BACKUP_COPAL`.",
+      "rawPath": "raw\\q09_with.json"
+    }
+  ],
+  "answersToReview": [
+    {
+      "caseId": "q08",
+      "missingGroups": [
+        [
+          "11"
+        ]
+      ],
+      "formatErrors": []
+    },
+    {
+      "caseId": "q09",
+      "missingGroups": [
+        [
+          "inconnu",
+          "inconnue",
+          "pas renseign",
+          "pas indiqu",
+          "pas disponible",
+          "ne sais pas",
+          "non document",
+          "non fourni",
+          "aucune information",
+          "impossible de déterminer",
+          "pas renseigné",
+          "pas renseignée",
+          "pas indiqué",
+          "pas indiquée",
+          "non documenté",
+          "non documentée",
+          "non fourni",
+          "non fournie",
+          "pas documenté",
+          "pas documentée",
+          "pas fourni",
+          "pas fournie",
+          "non disponible",
+          "pas accessible",
+          "ne figure pas",
+          "aucune donnée",
+          "je ne dispose pas",
+          "je n'ai pas",
+          "n'apparaît pas",
+          "aucun élément",
+          "non communiqué",
+          "non communiquée",
+          "pas communiqué",
+          "pas communiquée"
+        ]
+      ],
+      "formatErrors": []
+    },
+    {
+      "caseId": "q10",
+      "missingGroups": [
+        [
+          "14:20"
+        ]
+      ],
+      "formatErrors": []
+    },
+    {
+      "caseId": "q15",
+      "missingGroups": [
+        [
+          "inconnu",
+          "inconnue",
+          "pas renseign",
+          "pas indiqu",
+          "pas disponible",
+          "ne sais pas",
+          "non document",
+          "non fourni",
+          "aucune information",
+          "impossible de déterminer",
+          "pas renseigné",
+          "pas renseignée",
+          "pas indiqué",
+          "pas indiquée",
+          "non documenté",
+          "non documentée",
+          "non fourni",
+          "non fournie",
+          "pas documenté",
+          "pas documentée",
+          "pas fourni",
+          "pas fournie",
+          "non disponible",
+          "pas accessible",
+          "ne figure pas",
+          "aucune donnée",
+          "je ne dispose pas",
+          "je n'ai pas",
+          "n'apparaît pas",
+          "aucun élément",
+          "non communiqué",
+          "non communiquée",
+          "pas communiqué",
+          "pas communiquée"
+        ]
+      ],
+      "formatErrors": []
+    },
+    {
+      "caseId": "q24",
+      "missingGroups": [
+        [
+          "inconnu",
+          "inconnue",
+          "pas renseign",
+          "pas indiqu",
+          "pas disponible",
+          "ne sais pas",
+          "non document",
+          "non fourni",
+          "aucune information",
+          "impossible de déterminer",
+          "pas renseigné",
+          "pas renseignée",
+          "pas indiqué",
+          "pas indiquée",
+          "non documenté",
+          "non documentée",
+          "non fourni",
+          "non fournie",
+          "pas documenté",
+          "pas documentée",
+          "pas fourni",
+          "pas fournie",
+          "non disponible",
+          "pas accessible",
+          "ne figure pas",
+          "aucune donnée",
+          "je ne dispose pas",
+          "je n'ai pas",
+          "n'apparaît pas",
+          "aucun élément",
+          "non communiqué",
+          "non communiquée",
+          "pas communiqué",
+          "pas communiquée"
+        ]
+      ],
+      "formatErrors": []
+    }
+  ],
+  "limits": "Rule-bound one-shot test gate, not a continuous monitor or general semantic/hallucination detector. Frozen lexical metrics retained separately.",
+  "assessmentSha256": "1c40eceb167562dc72e13461ff3b38db58dd38c818c5f40b89a55ef17396c6dc"
+}

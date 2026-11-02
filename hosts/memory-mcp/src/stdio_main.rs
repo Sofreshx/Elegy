@@ -17,6 +17,8 @@ use tracing::{error, info, warn};
 const ELEGY_DB_PATH: &str = "ELEGY_DB_PATH";
 const ELEGY_MCP_AGENT_ID: &str = "ELEGY_MCP_AGENT_ID";
 const ELEGY_MCP_READ_SCOPE: &str = "ELEGY_MCP_READ_SCOPE";
+const ELEGY_MCP_SHARED_SPACE: &str = "ELEGY_MCP_SHARED_SPACE";
+const ELEGY_MCP_SHARED_AGENTS: &str = "ELEGY_MCP_SHARED_AGENTS";
 const ELEGY_EMBEDDING_MODEL: &str = "ELEGY_EMBEDDING_MODEL";
 const ELEGY_EMBEDDING_BOOT_POLICY: &str = "ELEGY_EMBEDDING_BOOT_POLICY";
 const ELEGY_ALLOW_NO_EMBEDDINGS: &str = "ELEGY_ALLOW_NO_EMBEDDINGS";
@@ -269,10 +271,7 @@ fn build_stdio_runtime_with_bootstrap(
     config: &StdioConfig,
     embedding_bootstrap: StdioEmbeddingBootstrap,
 ) -> anyhow::Result<StdioServerRuntime> {
-    let binding = MemoryBinding::new(&config.agent_id, &config.agent_id)
-        .context("configuring stdio memory binding")?
-        .with_read_scope(config.read_scope)
-        .including_unowned(true);
+    let binding = config.memory_binding()?;
     let memory_repository = Arc::new(match embedding_bootstrap {
         StdioEmbeddingBootstrap::ProviderBacked(embedding_provider) => {
             MemoryRepository::new_with_embedding_provider(
@@ -300,6 +299,8 @@ struct StdioConfig {
     db_path: PathBuf,
     agent_id: String,
     read_scope: MemoryScope,
+    shared_space: Option<String>,
+    shared_agents: Option<Vec<String>>,
     ollama_url: String,
     embedding_model: String,
     embedding_boot_policy: EmbeddingBootPolicy,
@@ -307,14 +308,58 @@ struct StdioConfig {
 
 impl StdioConfig {
     fn from_env() -> anyhow::Result<Self> {
-        Ok(Self {
+        let config = Self {
             db_path: required_path_env(ELEGY_DB_PATH)?,
             agent_id: configured_agent_id()?,
             read_scope: configured_read_scope()?,
+            shared_space: optional_shared_env(ELEGY_MCP_SHARED_SPACE)?,
+            shared_agents: optional_shared_env(ELEGY_MCP_SHARED_AGENTS)?
+                .map(|value| {
+                    serde_json::from_str::<Vec<String>>(&value).map_err(|_| {
+                        anyhow::anyhow!(
+                            "{ELEGY_MCP_SHARED_AGENTS} must be a JSON array of agent IDs"
+                        )
+                    })
+                })
+                .transpose()?,
             ollama_url: optional_string_env(OLLAMA_URL, DEFAULT_OLLAMA_URL)?,
             embedding_model: optional_string_env(ELEGY_EMBEDDING_MODEL, DEFAULT_OLLAMA_MODEL)?,
             embedding_boot_policy: configured_embedding_boot_policy()?,
-        })
+        };
+        // Validate the entire binding before provider boot or database creation.
+        config.memory_binding()?;
+        if config.shared_agents.is_some() && env::var(ELEGY_MCP_AGENT_ID).is_err() {
+            bail!("{ELEGY_MCP_AGENT_ID} must be explicit for shared agent reads");
+        }
+        Ok(config)
+    }
+
+    fn memory_binding(&self) -> anyhow::Result<MemoryBinding> {
+        if self.shared_space.is_some() != self.shared_agents.is_some() {
+            bail!("{ELEGY_MCP_SHARED_SPACE} and {ELEGY_MCP_SHARED_AGENTS} must be configured together");
+        }
+        let binding = MemoryBinding::new(
+            self.shared_space.as_deref().unwrap_or(&self.agent_id),
+            &self.agent_id,
+        )
+        .context("configuring stdio memory binding")?
+        .with_read_scope(self.read_scope)
+        .including_unowned(true);
+        match &self.shared_agents {
+            Some(agents) => binding
+                .with_shared_agents(agents.clone())
+                .context("configuring shared agent reads"),
+            None => Ok(binding),
+        }
+    }
+}
+
+fn optional_shared_env(name: &'static str) -> anyhow::Result<Option<String>> {
+    match env::var(name) {
+        Ok(value) if !value.trim().is_empty() => Ok(Some(value.trim().to_string())),
+        Ok(_) => bail!("{name} must not be blank when set"),
+        Err(env::VarError::NotPresent) => Ok(None),
+        Err(env::VarError::NotUnicode(_)) => bail!("{name} must be valid Unicode"),
     }
 }
 
@@ -530,6 +575,8 @@ mod tests {
         let db_path = temp_dir.path().join("memory.db");
         std::fs::write(&db_path, b"").expect("db placeholder should write");
         let config = StdioConfig {
+            shared_space: None,
+            shared_agents: None,
             db_path,
             agent_id: "stdio-test-agent".to_string(),
             read_scope: MemoryScope::Session,
@@ -588,6 +635,8 @@ mod tests {
         let db_path = temp_dir.path().join("memory.db");
         std::fs::write(&db_path, b"").expect("db placeholder should write");
         let config = StdioConfig {
+            shared_space: None,
+            shared_agents: None,
             db_path,
             agent_id: DEFAULT_AGENT_ID.to_string(),
             read_scope: MemoryScope::Session,
@@ -673,6 +722,8 @@ mod tests {
         });
 
         let config = StdioConfig {
+            shared_space: None,
+            shared_agents: None,
             db_path: PathBuf::from("unused.db"),
             agent_id: "stdio-test-agent".to_string(),
             read_scope: MemoryScope::Session,
@@ -711,6 +762,8 @@ mod tests {
     #[tokio::test]
     async fn resolve_embedding_bootstrap_prefer_degrades_after_exhausting_retries() {
         let config = StdioConfig {
+            shared_space: None,
+            shared_agents: None,
             db_path: PathBuf::from("unused.db"),
             agent_id: "stdio-test-agent".to_string(),
             read_scope: MemoryScope::Session,
@@ -735,6 +788,8 @@ mod tests {
     #[tokio::test]
     async fn resolve_embedding_bootstrap_off_skips_ollama_entirely() {
         let config = StdioConfig {
+            shared_space: None,
+            shared_agents: None,
             db_path: PathBuf::from("unused.db"),
             agent_id: "stdio-test-agent".to_string(),
             read_scope: MemoryScope::Session,

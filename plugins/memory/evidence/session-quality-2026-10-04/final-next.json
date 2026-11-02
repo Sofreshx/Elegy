@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "elegy.cli/v1",
+  "correlationId": "elegy-memory-17452-1791140894939379200",
+  "command": [
+    "eval.next"
+  ],
+  "status": "ok",
+  "data": {
+    "buildMatchesSource": true,
+    "next": {
+      "claim": {
+        "executor": "external-observation",
+        "falsifier": "A second configured agent returns the first agent's memory by ID, list or search.",
+        "id": "host.agent-isolation",
+        "limits": "Reported namespace isolation for the tested installation; not multi-tenant certification.",
+        "prerequisiteChecks": [
+          "same-database",
+          "owner-can-recall",
+          "cleanup"
+        ],
+        "promise": "An installed MCP agent namespace prevents another agent from recalling its private synthetic memory.",
+        "protocol": [
+          "Use two real client configurations on the same test database, with distinct agent namespaces.",
+          "Store a synthetic marker under A and confirm A recalls it.",
+          "Attempt ID recall, search and list under B; establish that an empty result is not a disconnected backend.",
+          "Record reviewed observations and clean up the marker."
+        ],
+        "protocolVersion": 1,
+        "requiredChecks": [
+          "same-database",
+          "owner-can-recall",
+          "other-agent-cannot-recall",
+          "cleanup"
+        ]
+      },
+      "externalSubjectRequiresRecheck": true,
+      "latestReceipt": "cfa93e81-aa37-448c-866f-1b7b8b060cba",
+      "nextAction": "Follow the claim protocol, then elegy-memory eval record --claim host.agent-isolation --observation FILE --json",
+      "nextInvocation": {
+        "args": [
+          "eval",
+          "record",
+          "--claim",
+          "host.agent-isolation",
+          "--observation",
+          "FILE",
+          "--project",
+          "\\\\?\\<project>",
+          "--evidence-dir",
+          "<project>\\plugins\\memory\\evidence\\session-quality-2026-10-04",
+          "--json"
+        ],
+        "program": "elegy-memory"
+      },
+      "observationSchema": "plugins/memory/schemas/qualification-observation.schema.json",
+      "protocolSha256": "c602123fff1ae89739cbc5f31b10e72bd10bd3df43661f9e582e220c902cbc87",
+      "provenance": "external-observation",
+      "receiptCount": 1,
+      "receiptPath": "receipts/cfa93e81-aa37-448c-866f-1b7b8b060cba.json",
+      "reviewRequired": true,
+      "staleReasons": [],
+      "status": "reported-inconclusive",
+      "subject": {
+        "artifactSha256": "901361065cedcd54091f828a96f77768283e596ee980f18372eac86d13246eaf",
+        "configurationSha256": "91b0b7921a5dc77faa44b52028741c9a4aa3f257cbf2797c1b61365012f6f647",
+        "host": "Codex CLI + OpenCode; second software host blocked",
+        "hostVersion": "Codex 0.160.0; OpenCode 1.18.21"
+      }
+    },
+    "rebuildRequired": false,
+    "schemaVersion": "memory-qualification/v1"
+  }
+}

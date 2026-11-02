@@ -1,0 +1,13 @@
+{
+  "stage": "native-local-replay",
+  "sourceRevision": "ef50a694238081527e2a28baa31f2e43691b8c2b",
+  "status": "completed",
+  "episodes": 8,
+  "packets": 24,
+  "sourceUnchangedPackets": 24,
+  "verifiedEmptyNamespaces": 16,
+  "approvedNativePrefixSha256": "c0b4adc6caff9c3fa8231c260efd14866e13fe4b760a78354d7195a10553e3c1",
+  "prefixBytes": 200,
+  "contextOverlayApplied": false,
+  "pinnedBinariesVerified": true
+}

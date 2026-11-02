@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "memory-current-source-availability/v1",
+  "completedAt": "2026-11-02T11:50:30.089271+00:00",
+  "status": "blocked-local-client-permission",
+  "scope": "one model availability preflight only; no replay or build",
+  "sourceRevision": "cdcb3957b2a3d4b4bfa2eb178f914254cb436dd2",
+  "model": "gpt-5.6-luna",
+  "reasoningEffort": "medium",
+  "codexVersion": "codex-cli 0.166.0-alpha.5.1",
+  "configuration": {
+    "argv": [
+      "<codex>",
+      "exec",
+      "--ignore-user-config",
+      "--ephemeral",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "--json",
+      "-C",
+      "<scratch-case>",
+      "-m",
+      "gpt-5.6-luna",
+      "-c",
+      "model_reasoning_effort=\"medium\"",
+      "-c",
+      "project_doc_max_bytes=0",
+      "-"
+    ],
+    "executableSha256": "3097c909fb6d5cd63510d44aceb1d42df9f6e85722a3e447e477def1ecf60e16",
+    "environment": "API keys/endpoints/Memory bindings removed; existing ChatGPT login only"
+  },
+  "configurationSha256": "b9206274c525e55b519b8f84f435cbc9d2cec51d2bea53ac7d98b13be5982348",
+  "exitCode": 1,
+  "elapsedMs": 244.658,
+  "ready": false,
+  "protocolIssues": [
+    "expected exactly one final assistant message",
+    "expected exactly one thread id",
+    "expected exactly one completed turn"
+  ],
+  "executionIssues": [
+    {
+      "type": "missing-or-duplicate-final/session",
+      "finalCount": 0,
+      "sessionCount": 0
+    },
+    {
+      "type": "process-exit",
+      "exitCode": 1
+    }
+  ],
+  "usage": {},
+  "loginStatusQueried": false,
+  "quotaQueried": false,
+  "credentialsReadOrCopied": false,
+  "paidApiFallback": false,
+  "inheritedMemoryAndProviderRoutesRemoved": true,
+  "frozenSourcesChanged": false,
+  "modelInvocationsAttempted": 1,
+  "completedModelTurns": 0,
+  "modelAvailability": "not established: client failed before thread/turn creation",
+  "failure": "Existing Codex local state initialization and in-process app-server client access denied; no model response or JSON protocol events",
+  "retries": 0
+}

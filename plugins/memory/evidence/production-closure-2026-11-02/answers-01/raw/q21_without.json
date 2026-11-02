@@ -1,0 +1,43 @@
+{
+  "answer": "Le budget monétaire mensuel approuvé pour Vesper-West est inconnu et non documenté dans les informations fournies.",
+  "threadId": "01a19c22-dc18-70e1-a755-940e67e82aec",
+  "usage": {
+    "input_tokens": 20854,
+    "cached_input_tokens": 16512,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 60,
+    "reasoning_output_tokens": 29
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a19c22-dc18-70e1-a755-940e67e82aec\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Le budget monétaire mensuel approuvé pour Vesper-West est inconnu et non documenté dans les informations fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20854,\"cached_input_tokens\":16512,\"cache_write_input_tokens\":0,\"output_tokens\":60,\"reasoning_output_tokens\":29}}\n",
+  "stderr": "2026-11-02T12:01:32.715028Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q21",
+  "arm": "without",
+  "startedAt": "2026-11-02T12:01:32.200138+00:00",
+  "completedAt": "2026-11-02T12:01:39.345534+00:00",
+  "elapsedMs": 7145.324,
+  "promptSha256": "954aac633af3fac9c6599892cb4a8cd0d0f3bb8ba880a975d64e9a854abc747e",
+  "configurationSha256": "b9206274c525e55b519b8f84f435cbc9d2cec51d2bea53ac7d98b13be5982348",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

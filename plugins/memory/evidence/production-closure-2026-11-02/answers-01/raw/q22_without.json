@@ -1,0 +1,43 @@
+{
+  "answer": "Quill doit expédier 21 caisses au total : 7 caisses × 3 services = 21.",
+  "threadId": "01a19c23-1ed3-7fc0-bd7d-4172e9361e22",
+  "usage": {
+    "input_tokens": 20863,
+    "cached_input_tokens": 16512,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 29,
+    "reasoning_output_tokens": 0
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a19c23-1ed3-7fc0-bd7d-4172e9361e22\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Quill doit expédier 21 caisses au total : 7 caisses × 3 services = 21.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20863,\"cached_input_tokens\":16512,\"cache_write_input_tokens\":0,\"output_tokens\":29,\"reasoning_output_tokens\":0}}\n",
+  "stderr": "2026-11-02T12:01:49.794018Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q22",
+  "arm": "without",
+  "startedAt": "2026-11-02T12:01:49.356368+00:00",
+  "completedAt": "2026-11-02T12:01:56.258909+00:00",
+  "elapsedMs": 6903.376,
+  "promptSha256": "4044aceaa751bd28ccc2f3d82bfecf22c5fb33ec51391439b7e0dff24a9e2a40",
+  "configurationSha256": "b9206274c525e55b519b8f84f435cbc9d2cec51d2bea53ac7d98b13be5982348",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

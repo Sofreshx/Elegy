@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "memory-provider-free-production-predeclaration/v1",
+  "declaredAt": "2026-11-02T13:25:21.586004+00:00",
+  "cleanHead": "Separate exact clean-head binding required before Cargo",
+  "stages": [
+    "benchmark first withofflineCargo",
+    "canonical two-package releasebuild+immutable pin",
+    "two local claims+status/next/history in newlocal-claims via permittednative context",
+    "fresh8episode24packet nativeCLI/stdio replay",
+    "source/binary/endverification"
+  ],
+  "expectedPrefixBytes": 202,
+  "expectedPrefixSha256": "b4d6645648f1a4874c27c10e4c6622ee81e7fbef0452d2c18e8a98f0588e5a43",
+  "criteria": {
+    "benchmarkEverySampleAuthorizedAndSourceUnchanged": true,
+    "latencyTargetMeasurementOnly": 500,
+    "canonicalBuildExitZeroAndSourceClean": true,
+    "pinnedBinariesMatchBuildAndSource": true,
+    "localClaimsSatisfied": [
+      "recall.contract",
+      "forgetting.retention"
+    ],
+    "ledgerAndReceiptsReadback": true,
+    "externalClaimsRemainUnverified": true,
+    "nativeReplayEpisodes": 8,
+    "nativePacketsSourceUnchanged": 24,
+    "emptyCleanupNamespaces": 16,
+    "nativeOriginalPrefixBytes": 202,
+    "sourceFrozen": "Root freezes trackedsource including guide throughoutfinalrun; require sameHEAD, cleanGit and all301hashes at phasechecks/end"
+  },
+  "zeroModelProviderNetworkCalls": true,
+  "offlineCargoEnforced": true,
+  "newCandidateOrModelTrial": false,
+  "rejectedCandidateBundleUnchanged": true,
+  "frozenHarnessHashes": {
+    "run_replay.py": "7c75b033edda96063a5f71e2f95d7b2c3d685e25d6dbd39fbaf3eb5518da0d26",
+    "rpc_support.py": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759",
+    "corpus.json": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b"
+  },
+  "limits": "Provider-free runtime mechanics; preserves earlier adverse answer-quality evidence and does not establish installed-host or autonomous-answer readiness."
+}

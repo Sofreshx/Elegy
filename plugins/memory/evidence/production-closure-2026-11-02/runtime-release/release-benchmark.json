@@ -1,0 +1,56 @@
+{
+  "benchmark": "contextual-recall-library-synthetic-v1",
+  "corpus": {
+    "authorizedExpected": 1,
+    "embedding": "none",
+    "forbiddenExactMatches": 4,
+    "lexicalDistractors": 1000,
+    "minSimilarity": 0.800000011920929,
+    "rows": 1005
+  },
+  "environment": {
+    "arch": "x86_64",
+    "availableParallelism": 8,
+    "debugAssertions": false,
+    "os": "windows",
+    "sqliteVersion": "3.46.0"
+  },
+  "journal": {
+    "events": 105,
+    "expectedItems": 105,
+    "sessions": 105
+  },
+  "latencyIsMeasurementOnly": true,
+  "latencyMs": {
+    "max": 412.3922,
+    "p50": 255.40610000000004,
+    "p95": 345.9311
+  },
+  "limits": "single local warm lexical workload; no provider, embedding, host-hook, concurrent writer, or production database measurement",
+  "p95TargetMet": true,
+  "p95TargetMs": 500.0,
+  "path": "in-process lexical recall; includes source open, ranking, and journal commit",
+  "sampling": {
+    "freshSessionPerCall": true,
+    "measuredCalls": 100,
+    "percentileMethod": "nearest-rank",
+    "setupAndAssertionsTimed": false,
+    "sharedJournal": true,
+    "warmupCalls": 5
+  },
+  "source": {
+    "bytesUnchanged": true,
+    "countersUnchanged": true,
+    "databaseBytes": 774144,
+    "sha256": "331aa2a5e5410f5b6f5c9b87bc3250c7b8e8a86a1436f48fb47f18366dfd0b4f",
+    "walBytes": 0,
+    "walUnchanged": true
+  },
+  "sourceRevision": "5c246906c7edf7fb876901b610d1de8352307715",
+  "providerFree": true,
+  "cargoOffline": true,
+  "measurementLoad": {
+    "rootCoordinatesNoCompetingCargoOrScans": true,
+    "universalIdleMachineClaim": false
+  }
+}

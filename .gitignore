@@ -57,6 +57,10 @@ elegy-memory-mvp-test-plan.md
 /target/agent-artifacts/
 /SESSION_TRACKING.md
 
+# Python helpers and offline qualification checks
+__pycache__/
+*.py[cod]
+
 # Local Cargo configuration
 /.cargo/config.toml
 

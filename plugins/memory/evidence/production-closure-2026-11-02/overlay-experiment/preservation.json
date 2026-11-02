@@ -1,0 +1,219 @@
+{
+  "schemaVersion": "memory-overlay-evidence-preservation/v1",
+  "label": "PROMPT-OVERLAY EXPERIMENT",
+  "sourceLabel": "completed-envelope-experiment-scratch",
+  "preservedLosslessly": [
+    {
+      "path": "answers-01/raw/q01_with.json",
+      "bytes": 1754,
+      "sha256": "b05efce1b7e5ed34907ebb8f512ae99cef65d7add937a5171e12d244b1f73921",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q02_with.json",
+      "bytes": 2229,
+      "sha256": "23e53500afc01d5158232de99ef07c8bface8f993435ebb4914f97554378762b",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q03_with.json",
+      "bytes": 1804,
+      "sha256": "ce0439620a6ee39bbbd5057aca7f40d9865e842c1083fbd168f3f6a9deb6541b",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q04_with.json",
+      "bytes": 1844,
+      "sha256": "0bf62d29bbcebd5e9f4f3768562126412f030a7ada4cb9d63e3e9588ef0cb1d5",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q05_with.json",
+      "bytes": 1780,
+      "sha256": "13e30b917bb1266db83e0b17fdfd706399eb7704a6356b905405e098d0d372b3",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q06_with.json",
+      "bytes": 1810,
+      "sha256": "4d6335287755724cb8b07601cfeb3bad02591e68c87bfa1a20dd8658115b48b9",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q07_with.json",
+      "bytes": 1793,
+      "sha256": "7abb85f875a09b3b71a6b5aed6679f9ba475e2522e92197bfac21d1223d4284f",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q08_with.json",
+      "bytes": 1799,
+      "sha256": "897aeb8b73759db7d5f5b8207f10af5b70d325d5c8eabdf7a82d00aae495bfca",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q09_with.json",
+      "bytes": 1860,
+      "sha256": "ebaa07cceeb234a46d1fcdee926226bd9ab969a5cf9c344397e2f689001b2d71",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q10_with.json",
+      "bytes": 1833,
+      "sha256": "5585982abd914933c81386df4de6211f0f3b9bd544723f7559faa38a954971ef",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q11_with.json",
+      "bytes": 1738,
+      "sha256": "d967654406c07d56cba100a4877971035a7b93c338cd29ec89c098d7feb70c6a",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q12_with.json",
+      "bytes": 1792,
+      "sha256": "137265054c926809a0edc8f217e612031a21556e8b1c7c2364ef0694c4a93b2e",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q13_with.json",
+      "bytes": 1766,
+      "sha256": "448491363c6f150d13ad5ebd949cf569d25516a2f8f97f414b9152d9106b616b",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q14_with.json",
+      "bytes": 1772,
+      "sha256": "017cd38127dc329beac92034cded9a2dacf74ecfcf9c43c1f899a48bd80eedfd",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q15_with.json",
+      "bytes": 1775,
+      "sha256": "a81716c244c611e3643c3621f28ed73ef4f496f962a584ff50b94237b4a1a488",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q16_with.json",
+      "bytes": 1856,
+      "sha256": "5e36e5a1de1dae18c772a61095e242e44389f5738cfc40a59dddcc2d48fab804",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q17_with.json",
+      "bytes": 1826,
+      "sha256": "8554e68d7a0e86120e369868a3c038e0196d9a7907306224c2c46e5c8f9215a0",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q18_with.json",
+      "bytes": 1764,
+      "sha256": "849230bbc0dc7a8358f602049ac9c1cb5e5e0af3f9b975cff0344eedcd06a7ea",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q19_with.json",
+      "bytes": 1780,
+      "sha256": "60a0b82e9414657d74ce9d660533f6272ddfe849fe8f25ad7ba777e8556a17ef",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q20_with.json",
+      "bytes": 1786,
+      "sha256": "da0f2b29b390b3e890bdb61099f1611f7bc40b4ef6a170616ccc467a2c3f5387",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q21_with.json",
+      "bytes": 1868,
+      "sha256": "3030ddff524ddbd49e58d31c6166fb9fec20b9f0c0f2e8b17e586e7feaf1dd0c",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q22_with.json",
+      "bytes": 1733,
+      "sha256": "5a1f133016dc4f79e31175ac29bfa26472ab61813bfc474e2f0a569766c200fa",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q23_with.json",
+      "bytes": 3663,
+      "sha256": "ca4504a618798c66c83a60b16185197f140e825a3ccf552416c7166ea809b6cb",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/raw/q24_with.json",
+      "bytes": 1692,
+      "sha256": "798aee024886c4cd91499a3df74355b69463d590d651f89737cdf29d803e508a",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01/run.json",
+      "bytes": 5615,
+      "sha256": "0927833e2003f52b409f9da0f67b0565dc87c223689a7b9578e1ad94a3a23306",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "answers-01.log",
+      "bytes": 1808,
+      "sha256": "001806c071d58dc637dc5b6b855f829d96c4e4e9f26f7481c58b145fca6f7aab",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "assessment.json",
+      "bytes": 21000,
+      "sha256": "167874c1aba8cdecf42bb63692eba6ebb2776252e3686a2d1b3f3f93964919f5",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "candidate.txt",
+      "bytes": 200,
+      "sha256": "c0b4adc6caff9c3fa8231c260efd14866e13fe4b760a78354d7195a10553e3c1",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "original.txt",
+      "bytes": 202,
+      "sha256": "b4d6645648f1a4874c27c10e4c6622ee81e7fbef0452d2c18e8a98f0588e5a43",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "predeclaration.json",
+      "bytes": 2510,
+      "sha256": "7749cb8f927c9788c27b777d0a45be7f675789fc02f52fa69d70795eb1ede756",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "run_experiment.py",
+      "bytes": 8660,
+      "sha256": "e20c1d9eec675f1d849f5654f24e5b6151e77edd0595017627c9654e1e642c34",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "semantic-review.json",
+      "bytes": 11077,
+      "sha256": "b23215e5765e7959031b6a2d7fc29d7b7a2d309b2584cc63086be7272ecde132",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "source-and-overlay-packets.json",
+      "bytes": 132337,
+      "sha256": "8f7dbd5924d584ad9d2722b71e29dcfa5ef21ab1cd99bf6253fe6a5bab48a4ed",
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "verdict.json",
+      "bytes": 3229,
+      "sha256": "c2933142a827d90b1b077b8b70212fb8e2f6318ae47e17423e650397b14cd73a",
+      "sourceBytesEqual": true
+    }
+  ],
+  "derivedCopies": [],
+  "omittedUnsafeSources": [],
+  "excludedSources": [],
+  "sourcePathFindings": 0,
+  "baselineRelationship": "24 new with-only sessions, zero new without sessions; original controls descriptive only; no fresh paired causal A/B claim.",
+  "nativeQualification": false,
+  "publicationGate": "root-owned; not performed by preservation worker",
+  "orchestrationScriptLimit": "run_experiment.py is unchanged provenance. It expects the original current-replay sibling layout and imports its omitted original wrapper; it is not a standalone runnable artifact in this portable directory."
+}

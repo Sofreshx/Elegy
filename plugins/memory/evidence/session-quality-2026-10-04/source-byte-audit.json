@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "memory-source-byte-audit/v1",
+  "head": "acc6b4e22625841ce0fdde55226472cd416728f1",
+  "fileCount": 144,
+  "worktreeSha256": "d1b0e0bec07aace5381a8ac3d5185b633cd17c3069e206e2aea00fe7e407f1fa",
+  "lfNormalizedSha256": "d283159caab00983358fda48968b4f868cea87f775bc0f7244da85a432acbbc3",
+  "crlfNormalizedSha256": "6369a77043b256a4bcb2467c64306f8844f09d0fe6afde437c8210cb2704ba62",
+  "priorReceiptSha256": "a5d7d8d412c138f11c4f10e8be219db13eb4fe6d4d36404fd9144f49657da589",
+  "limit": "Normalization variants are diagnostic only; actual raw worktree/build bytes remain qualification authority."
+}

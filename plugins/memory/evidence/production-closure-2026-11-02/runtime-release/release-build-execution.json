@@ -1,0 +1,22 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "-p",
+    "elegy-memory",
+    "-p",
+    "elegy-memory-mcp",
+    "--bin",
+    "elegy-memory",
+    "--bin",
+    "elegy-memory-mcp-stdio"
+  ],
+  "exitCode": 0,
+  "startedAt": "2026-11-02T14:01:46.204191+00:00",
+  "completedAt": "2026-11-02T14:03:22.308148+00:00",
+  "durationSeconds": 96.104,
+  "cargoOffline": true,
+  "modelProviderNetworkCalls": 0
+}

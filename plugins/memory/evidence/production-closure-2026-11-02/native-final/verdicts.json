@@ -1,0 +1,106 @@
+{
+  "schemaVersion": "memory-realistic-acceptance/v1",
+  "status": "review-required",
+  "executionErrors": [],
+  "criticalAnswerErrors": [],
+  "answersToReview": [
+    {
+      "caseId": "q15",
+      "missingGroups": [
+        [
+          "inconnu",
+          "inconnue",
+          "pas renseign",
+          "pas indiqu",
+          "pas disponible",
+          "ne sais pas",
+          "non document",
+          "non fourni",
+          "aucune information",
+          "impossible de déterminer",
+          "pas renseigné",
+          "pas renseignée",
+          "pas indiqué",
+          "pas indiquée",
+          "non documenté",
+          "non documentée",
+          "non fourni",
+          "non fournie",
+          "pas documenté",
+          "pas documentée",
+          "pas fourni",
+          "pas fournie",
+          "non disponible",
+          "pas accessible",
+          "ne figure pas",
+          "aucune donnée",
+          "je ne dispose pas",
+          "je n'ai pas",
+          "n'apparaît pas",
+          "aucun élément",
+          "non communiqué",
+          "non communiquée",
+          "pas communiqué",
+          "pas communiquée"
+        ]
+      ],
+      "formatErrors": []
+    },
+    {
+      "caseId": "q19",
+      "missingGroups": [
+        [
+          "REGION_AMBER"
+        ],
+        [
+          "ROLLBACK_LARCH"
+        ]
+      ],
+      "formatErrors": []
+    },
+    {
+      "caseId": "q24",
+      "missingGroups": [
+        [
+          "inconnu",
+          "inconnue",
+          "pas renseign",
+          "pas indiqu",
+          "pas disponible",
+          "ne sais pas",
+          "non document",
+          "non fourni",
+          "aucune information",
+          "impossible de déterminer",
+          "pas renseigné",
+          "pas renseignée",
+          "pas indiqué",
+          "pas indiquée",
+          "non documenté",
+          "non documentée",
+          "non fourni",
+          "non fournie",
+          "pas documenté",
+          "pas documentée",
+          "pas fourni",
+          "pas fournie",
+          "non disponible",
+          "pas accessible",
+          "ne figure pas",
+          "aucune donnée",
+          "je ne dispose pas",
+          "je n'ai pas",
+          "n'apparaît pas",
+          "aucun élément",
+          "non communiqué",
+          "non communiquée",
+          "pas communiqué",
+          "pas communiquée"
+        ]
+      ],
+      "formatErrors": []
+    }
+  ],
+  "limits": "Rule-bound one-shot test gate, not a continuous monitor or general semantic/hallucination detector. Frozen lexical metrics retained separately.",
+  "assessmentSha256": "b3b3060ae10086a48f8175d40b82dd69217f2ca3345599e7dc9da568462231ce"
+}

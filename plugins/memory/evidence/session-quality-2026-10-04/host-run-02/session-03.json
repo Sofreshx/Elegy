@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "<local-path>\\AppData\\Local\\Microsoft\\WinGet\\Packages\\SST.opencode_Microsoft.Winget.Source_8wekyb3d8bbwe\\opencode.EXE",
+    "--pure",
+    "run",
+    "--format",
+    "json",
+    "--model",
+    "opencode/big-pickle",
+    "First attempt memory_recall by A's id b1313051-eb20-4da5-89a4-958ccf1d56d0, memory_search for A's query label topic-195661a4158e, and memory_list; report whether any A record is visible. Then use memory_store to store this exact synthetic fact: QUALB-39FDBC8B32E1. Return the new memory id only. Use only the memory MCP tools. Do not read files, use shell, network, other tools, skills or delegates. This is a synthetic isolated test; perform all requested memory tool calls, then finish."
+  ],
+  "exitCode": 1,
+  "stdout": "{\"type\":\"error\",\"timestamp\":1791138837121,\"sessionID\":\"ses_ef7ce7e90ffebkkXkmGt6QafMO\",\"error\":{\"name\":\"APIError\",\"data\":{\"message\":\"Error from provider (Console): OpenCode's free tier can only be used from within OpenCode\",\"statusCode\":403,\"isRetryable\":false,\"responseHeaders\":{\"cf-placement\":\"remote-ORD\",\"cf-ray\":\"a456471cf893b324-PIT\",\"connection\":\"keep-alive\",\"content-encoding\":\"br\",\"content-type\":\"application/json\",\"date\":\"Sun, 04 Oct 2026 18:33:56 GMT\",\"server\":\"cloudflare\",\"transfer-encoding\":\"chunked\"},\"responseBody\":\"{\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"FreeTierError\\\",\\\"message\\\":\\\"Error from provider (Console): OpenCode's free tier can only be used from within OpenCode\\\"}}\",\"metadata\":{\"url\":\"https://opencode.ai/zen/v1/chat/completions\"}}}}\n",
+  "stderr": "unknown format \"uint64\" ignored in schema at path \"#/properties/consolidated\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/consolidated\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/contradicted\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/contradicted\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/dormant\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/dormant\"\nunknown format \"uint\" ignored in schema at path \"#/properties/count\"\nunknown format \"uint\" ignored in schema at path \"#/properties/count\"\nunknown format \"uint\" ignored in schema at path \"#/properties/count\"\nunknown format \"uint\" ignored in schema at path \"#/properties/count\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/activeCount\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/activeCount\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/dormantCount\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/dormantCount\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/staleEmbeddingsCount\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/staleEmbeddingsCount\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/totalCount\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/totalCount\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/typeCounts/additionalProperties\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/typeCounts/additionalProperties\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/unresolvedContradictions\"\nunknown format \"uint64\" ignored in schema at path \"#/properties/unresolvedContradictions\"\n",
+  "elapsedMs": 18000.0,
+  "timedOut": false,
+  "index": 3,
+  "host": "opencode",
+  "agent": "qual-b",
+  "prompt": "First attempt memory_recall by A's id b1313051-eb20-4da5-89a4-958ccf1d56d0, memory_search for A's query label topic-195661a4158e, and memory_list; report whether any A record is visible. Then use memory_store to store this exact synthetic fact: QUALB-39FDBC8B32E1. Return the new memory id only. Use only the memory MCP tools. Do not read files, use shell, network, other tools, skills or delegates. This is a synthetic isolated test; perform all requested memory tool calls, then finish.",
+  "timestamp": "2026-10-04T18:33:58.403399+00:00"
+}

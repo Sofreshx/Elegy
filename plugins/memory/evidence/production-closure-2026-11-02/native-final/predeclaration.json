@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "memory-native-prefix-predeclaration/v1",
+  "label": "NATIVE PREFIX QUALIFICATION",
+  "declaredAt": "2026-11-02T12:56:42.840309+00:00",
+  "approvedRuntimePrefixCommit": "686fcb59055cf072140fee58418ede873d3d14c1",
+  "cleanQualificationHead": "pending explicit root signal",
+  "modelCallsAtDeclaration": 0,
+  "stages": [
+    "benchmark first",
+    "canonical two-package release build and immutable pin",
+    "fresh native eight-episode 24-packet replay",
+    "fresh 24-pair 48-session model campaign",
+    "unchanged frozen scoring plus grounded semantic criteria"
+  ],
+  "criteria": {
+    "all48ValidNoTools": true,
+    "withSemanticComplete": 24,
+    "q08ExplicitRetention": "11 days",
+    "q09": "Backup/snapshot identifier unknown; no runbook substituted as identifier",
+    "q17AndQ18": "75 minutes and REPLAY_PINE",
+    "allNegativeControlsContinuePass": true,
+    "noNewSemanticErrorsAmongPreviouslyCorrect": true,
+    "frozenMeanMinimum": 0.8402777778,
+    "meanTolerance": 1e-06,
+    "lexicalFullyCorrectMinimum": 19,
+    "positiveFreshPairedMeanDifference": true
+  },
+  "model": "gpt-5.6-luna",
+  "reasoningEffort": "medium",
+  "maxConcurrentPairs": 3,
+  "rubricChanged": false,
+  "questionCorpusSha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b",
+  "originalProtocolSha256": "df253c5683deb07bac3b28f89bf80bbaef6fce21ea6a9086fed95f461e2acc4b",
+  "candidatePrefixSha256": "c0b4adc6caff9c3fa8231c260efd14866e13fe4b760a78354d7195a10553e3c1",
+  "noPromptOverlay": true,
+  "noExtraAvailabilityModelCall": true,
+  "failurePolicy": "Preserve all results; no retries, candidate changes, substitutions or threshold adjustments to chase success. Native output remains unmodified.",
+  "activation": "No real Memory database/configuration/tunnel/key changes."
+}

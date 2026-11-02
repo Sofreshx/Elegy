@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "memory-realistic-replay/v1",
+  "startedAt": "2026-11-02T14:04:06.411614+00:00",
+  "completedAt": "2026-11-02T14:04:48.213349+00:00",
+  "sourceRevision": "5c246906c7edf7fb876901b610d1de8352307715",
+  "cliSha256": "989c537e201cbc9cabfd69af416b002a4cf00cb777fa3da61a5455a4cf41795d",
+  "mcpSha256": "ac0e39fcabcbd6faba96b9611ae6d6168eca748a995fe3623bc2654221e912ef",
+  "corpusSha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b",
+  "protocolSha256": "7cd6dc54bef7f90729c64f54f728b881d54297d9bb56bb16794a24ee718d687e",
+  "runnerSha256": "7c75b033edda96063a5f71e2f95d7b2c3d685e25d6dbd39fbaf3eb5518da0d26",
+  "supportSha256": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759",
+  "episodes": [
+    {
+      "id": "cedar",
+      "status": "completed",
+      "stageCount": 3,
+      "error": null
+    },
+    {
+      "id": "lumen",
+      "status": "completed",
+      "stageCount": 3,
+      "error": null
+    },
+    {
+      "id": "ares",
+      "status": "completed",
+      "stageCount": 3,
+      "error": null
+    },
+    {
+      "id": "sable",
+      "status": "completed",
+      "stageCount": 3,
+      "error": null
+    },
+    {
+      "id": "galen",
+      "status": "completed",
+      "stageCount": 3,
+      "error": null
+    },
+    {
+      "id": "harbor",
+      "status": "completed",
+      "stageCount": 3,
+      "error": null
+    },
+    {
+      "id": "vesper",
+      "status": "completed",
+      "stageCount": 3,
+      "error": null
+    },
+    {
+      "id": "quill",
+      "status": "completed",
+      "stageCount": 3,
+      "error": null
+    }
+  ],
+  "status": "completed"
+}

@@ -1,0 +1,43 @@
+{
+  "answer": "La cause racine de l’incident Sable n’est pas disponible dans les informations fournies.",
+  "threadId": "01a19c22-4f08-72e3-843f-3379f5bf7f53",
+  "usage": {
+    "input_tokens": 20853,
+    "cached_input_tokens": 10496,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 50,
+    "reasoning_output_tokens": 24
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a19c22-4f08-72e3-843f-3379f5bf7f53\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"La cause racine de l’incident Sable n’est pas disponible dans les informations fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20853,\"cached_input_tokens\":10496,\"cache_write_input_tokens\":0,\"output_tokens\":50,\"reasoning_output_tokens\":24}}\n",
+  "stderr": "2026-11-02T12:00:56.601034Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q12",
+  "arm": "without",
+  "startedAt": "2026-11-02T12:00:56.120667+00:00",
+  "completedAt": "2026-11-02T12:01:02.916756+00:00",
+  "elapsedMs": 6796.603,
+  "promptSha256": "a61abc74506ee8e5bdbbe538b5c20cbc37bd4ffa2c214ca6f9a1cfa79d4558ca",
+  "configurationSha256": "b9206274c525e55b519b8f84f435cbc9d2cec51d2bea53ac7d98b13be5982348",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

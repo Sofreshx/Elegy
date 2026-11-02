@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "memory-evidence-redaction/v1",
+  "scope": "Local path prefixes only; raw originals remain local and ignored.",
+  "entries": [
+    {
+      "path": "host-run-01/preflight.json",
+      "beforeSha256": "ed0ea2223a36ec1049d4b6ac7200fff603238aadb5c73b4f53f0ddb02c0f9d37",
+      "afterSha256": "53d8d5edfce4943e1dbb0f4abd3ad64beb595fd07fc3a16e3f04d1953c7836e2"
+    },
+    {
+      "path": "host-run-01/session-01.json",
+      "beforeSha256": "f88fdd0e5d6e4f54000f5ad583dc8bf682862909338d457e4113d9fd06d63528",
+      "afterSha256": "918cf5613ea798705fc2399bbbbd4be3f34fd0821adb8627a463cd74219e5178"
+    },
+    {
+      "path": "host-run-02/preflight.json",
+      "beforeSha256": "2300351edcf28b40cb9af0e8b3ac52fb50ae91472439618e4d76e4d1d59ab6ba",
+      "afterSha256": "7d22005f426960f558b220d2416ed0c2eaddf4d7baad1672a60c50f2b57a5dc0"
+    },
+    {
+      "path": "host-run-02/session-01.json",
+      "beforeSha256": "8f0321f8dcc06aba7c58b4cd28bfb432961c998a6a267bdc8e3763c555cac81c",
+      "afterSha256": "92593f483122e5c2ea73271c5cb26d54160f8955552ab6e837bf983858df5568"
+    },
+    {
+      "path": "host-run-02/session-02.json",
+      "beforeSha256": "bf426bbae44676fbe7603e930470e1df77fa6edb879a2fcd6697261ad615fd06",
+      "afterSha256": "5ed6d9df29d1332e211e504f4f2f8aa94ec81dd18b764d3a24eb8e2f753e86a0"
+    },
+    {
+      "path": "host-run-03/preflight.json",
+      "beforeSha256": "77547d0fc83d8963fb341fe50fff40c7e244fdc5d77281308f3f8a1e7838f975",
+      "afterSha256": "7eeb62a30fd8fcc0530131fc3798f7be0362858e0511aaaa3c889e33408ef13a"
+    },
+    {
+      "path": "host-run-03/session-01.json",
+      "beforeSha256": "4d6cef05d397bc3dd48b783f9f66243b5e9a8a5357709ba0c4800f156a754037",
+      "afterSha256": "ac526789cf41eb08c515f5ff87b5a738b22f66ed60642318a8dae4066d62fbdf"
+    },
+    {
+      "path": "host-run-03/session-02.json",
+      "beforeSha256": "d40e9c0be15f15a7114edf7b3657071a24edfb5655f1801aa0881a4b686cf1a1",
+      "afterSha256": "22f3b56868c53e4f09e9d97fdebbdc4a13e06ddab03c3a29f819b28161f5e195"
+    }
+  ]
+}

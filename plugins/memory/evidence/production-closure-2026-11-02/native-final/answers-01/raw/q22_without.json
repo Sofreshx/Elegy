@@ -1,0 +1,43 @@
+{
+  "answer": "Quill doit expédier 21 caisses au total : 7 caisses × 3 services = 21.",
+  "threadId": "01a19c67-6fc4-7142-b2c1-3329d076a9a1",
+  "usage": {
+    "input_tokens": 20869,
+    "cached_input_tokens": 16512,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 29,
+    "reasoning_output_tokens": 0
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a19c67-6fc4-7142-b2c1-3329d076a9a1\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Quill doit expédier 21 caisses au total : 7 caisses × 3 services = 21.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20869,\"cached_input_tokens\":16512,\"cache_write_input_tokens\":0,\"output_tokens\":29,\"reasoning_output_tokens\":0}}\n",
+  "stderr": "2026-11-02T13:16:26.965019Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n2026-11-02T13:16:33.451598Z  WARN codex_core_plugins::manager: failed to refresh cached remote plugin catalog error=failed to send remote plugin catalog request to https://chatgpt.com/backend-api/ps/plugins/list?scope=GLOBAL&limit=200&pageToken=eyJzY29wZSI6IkdMT0JBTCIsIndvcmtzcGFjZV9pZCI6bnVsbCwiY3JlYXRvcl9hY2NvdW50X3VzZXJfaWQiOm51bGwsImNvbGxlY3Rpb24iOm51bGwsImluY2x1ZGVfdW5saXN0ZWRfZ2xvYmFsX3BsdWdpbnMiOnRydWUsImVsaWdpYmxlX3BsYW5fdHlwZSI6InByb2xpdGUiLCJlbmZvcmNlX3BsYW5fZWxpZ2liaWxpdHkiOmZhbHNlLCJyYW5rX2J5X3BvcHVsYXJpdHkiOnRydWUsImNvbnRpbnVhdGlvbiI6eyJkZXBsb3ltZW50X3R5cGUiOiJwcmltYXJ5IiwicXVlcnlfaWQiOiJyczQ6YjJlNzcwODctMDdiMC00N2NhLTg0YzEtYzc2OGE3MTFjMzEzOm5ab0h3ODA6MDpsZWFmLTdhYTdkMzk4LWNmMTUtNDkzZC1hMjIwLTNjOWQ5YWM2NjQ3NiIsImN1cnNvciI6IlpINjlkWEM0Z0x2dmVITHBoSlVLNmZqaTJOR2pQTlMwR3NWQ3BKVlpnX3ZVTmVFRmNaNWNkalM0Q0pncFJaWmdyUTZIMTdZVGg3dUQwdG5tWVJxNmVzdmRrUjVoMG1qMllMQmZNQmE0bC1uT0dibzZoWGFNckREUG1tS0o2VzFKcWNLZWJFR1dyeVlweGF6YVgyTUcxTjc0R1E5SkkzNGc4Q2FEUmxFOUFQcVNSa1dVQi1GbU5RU0FlQnc5bGxqWndjZW9YeFZrbjhNPSJ9fQ: error sending request for url (https://chatgpt.com/backend-api/ps/plugins/list?scope=GLOBAL&limit=200&pageToken=eyJzY29wZSI6IkdMT0JBTCIsIndvcmtzcGFjZV9pZCI6bnVsbCwiY3JlYXRvcl9hY2NvdW50X3VzZXJfaWQiOm51bGwsImNvbGxlY3Rpb24iOm51bGwsImluY2x1ZGVfdW5saXN0ZWRfZ2xvYmFsX3BsdWdpbnMiOnRydWUsImVsaWdpYmxlX3BsYW5fdHlwZSI6InByb2xpdGUiLCJlbmZvcmNlX3BsYW5fZWxpZ2liaWxpdHkiOmZhbHNlLCJyYW5rX2J5X3BvcHVsYXJpdHkiOnRydWUsImNvbnRpbnVhdGlvbiI6eyJkZXBsb3ltZW50X3R5cGUiOiJwcmltYXJ5IiwicXVlcnlfaWQiOiJyczQ6YjJlNzcwODctMDdiMC00N2NhLTg0YzEtYzc2OGE3MTFjMzEzOm5ab0h3ODA6MDpsZWFmLTdhYTdkMzk4LWNmMTUtNDkzZC1hMjIwLTNjOWQ5YWM2NjQ3NiIsImN1cnNvciI6IlpINjlkWEM0Z0x2dmVITHBoSlVLNmZqaTJOR2pQTlMwR3NWQ3BKVlpnX3ZVTmVFRmNaNWNkalM0Q0pncFJaWmdyUTZIMTdZVGg3dUQwdG5tWVJxNmVzdmRrUjVoMG1qMllMQmZNQmE0bC1uT0dibzZoWGFNckREUG1tS0o2VzFKcWNLZWJFR1dyeVlweGF6YVgyTUcxTjc0R1E5SkkzNGc4Q2FEUmxFOUFQcVNSa1dVQi1GbU5RU0FlQnc5bGxqWndjZW9YeFZrbjhNPSJ9fQ) scope=Global\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q22",
+  "arm": "without",
+  "startedAt": "2026-11-02T13:16:26.540612+00:00",
+  "completedAt": "2026-11-02T13:16:33.478469+00:00",
+  "elapsedMs": 6937.712,
+  "promptSha256": "4044aceaa751bd28ccc2f3d82bfecf22c5fb33ec51391439b7e0dff24a9e2a40",
+  "configurationSha256": "b9206274c525e55b519b8f84f435cbc9d2cec51d2bea53ac7d98b13be5982348",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

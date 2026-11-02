@@ -1,0 +1,642 @@
+{
+  "schemaVersion": "memory-replay-episode/v1",
+  "id": "quill",
+  "startedAt": "2026-10-23T03:20:26.758355+00:00",
+  "status": "failed",
+  "stages": [],
+  "rpc": [
+    {
+      "client": "q22-write-bag",
+      "timestamp": "2026-10-23T03:20:27.163716+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 406.0
+    },
+    {
+      "client": "q22-write-bag",
+      "timestamp": "2026-10-23T03:20:27.164715+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q22-write-bag",
+      "timestamp": "2026-10-23T03:20:27.169799+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_store",
+          "arguments": {
+            "content": "Quill shipping bag routing label is BAG_PLUM.",
+            "importance": 0.9,
+            "provenance": "user-stated"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"action\":\"added\",\"embeddingStatus\":\"skipped_no_provider\",\"gateResult\":\"accepted\",\"memory\":{\"content\":\"Quill shipping bag routing label is BAG_PLUM.\",\"createdAt\":\"2026-10-23T03:20:27.166970300+00:00\",\"id\":\"80fd6995-fceb-4cc5-bf97-46ddefc1a827\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:20:27.166970300+00:00\"},\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "action": "added",
+            "embeddingStatus": "skipped_no_provider",
+            "gateResult": "accepted",
+            "memory": {
+              "content": "Quill shipping bag routing label is BAG_PLUM.",
+              "createdAt": "2026-10-23T03:20:27.166970300+00:00",
+              "id": "80fd6995-fceb-4cc5-bf97-46ddefc1a827",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:20:27.166970300+00:00"
+            },
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q22-write-bag",
+      "timestamp": "2026-10-23T03:20:27.336283+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:26.776668Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "q22-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:27.369237+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 31.0
+    },
+    {
+      "client": "q22-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:27.369237+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q22-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:27.372584+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_recall",
+          "arguments": {
+            "id": "80fd6995-fceb-4cc5-bf97-46ddefc1a827"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"found\":true,\"memory\":{\"content\":\"Quill shipping bag routing label is BAG_PLUM.\",\"createdAt\":\"2026-10-23T03:20:27.166970300+00:00\",\"id\":\"80fd6995-fceb-4cc5-bf97-46ddefc1a827\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:20:27.166970300+00:00\"},\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "found": true,
+            "memory": {
+              "content": "Quill shipping bag routing label is BAG_PLUM.",
+              "createdAt": "2026-10-23T03:20:27.166970300+00:00",
+              "id": "80fd6995-fceb-4cc5-bf97-46ddefc1a827",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:20:27.166970300+00:00"
+            },
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q22-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:27.446896+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_search",
+          "arguments": {
+            "query": "Quill shipping bag routing label is BAG_PLUM.",
+            "limit": 100
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":1,\"includeDormant\":false,\"namespace\":\"qual-a\",\"query\":\"Quill shipping bag routing label is BAG_PLUM.\",\"results\":[{\"id\":\"80fd6995-fceb-4cc5-bf97-46ddefc1a827\",\"memoryType\":\"observation\",\"preview\":\"Quill shipping bag routing label is BAG_PLUM.\",\"score\":1.0126420259475708,\"similarity\":1.0,\"state\":\"active\"}]}"
+            }
+          ],
+          "structuredContent": {
+            "count": 1,
+            "includeDormant": false,
+            "namespace": "qual-a",
+            "query": "Quill shipping bag routing label is BAG_PLUM.",
+            "results": [
+              {
+                "id": "80fd6995-fceb-4cc5-bf97-46ddefc1a827",
+                "memoryType": "observation",
+                "preview": "Quill shipping bag routing label is BAG_PLUM.",
+                "score": 1.0126420259475708,
+                "similarity": 1.0,
+                "state": "active"
+              }
+            ]
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 78.0
+    },
+    {
+      "client": "q22-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:27.567808+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:27.357626Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "quill-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:27.696762+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 31.0
+    },
+    {
+      "client": "quill-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:27.696762+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "quill-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:27.700522+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":1,\"includeDormant\":true,\"memories\":[{\"id\":\"80fd6995-fceb-4cc5-bf97-46ddefc1a827\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"preview\":\"Quill shipping bag routing label is BAG_PLUM.\",\"provenance\":\"user-stated\",\"state\":\"active\",\"updatedAt\":\"2026-10-23T03:20:27.166970300+00:00\"}],\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 1,
+            "includeDormant": true,
+            "memories": [
+              {
+                "id": "80fd6995-fceb-4cc5-bf97-46ddefc1a827",
+                "importance": 0.8999999761581421,
+                "memoryType": "observation",
+                "preview": "Quill shipping bag routing label is BAG_PLUM.",
+                "provenance": "user-stated",
+                "state": "active",
+                "updatedAt": "2026-10-23T03:20:27.166970300+00:00"
+              }
+            ],
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "quill-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:27.802481+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_delete",
+          "arguments": {
+            "id": "80fd6995-fceb-4cc5-bf97-46ddefc1a827"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"deleted\":true,\"id\":\"80fd6995-fceb-4cc5-bf97-46ddefc1a827\",\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "deleted": true,
+            "id": "80fd6995-fceb-4cc5-bf97-46ddefc1a827",
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 110.0
+    },
+    {
+      "client": "quill-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:27.803480+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 4,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "quill-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:27.972782+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:27.680922Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "quill-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:28.003130+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 31.0
+    },
+    {
+      "client": "quill-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:28.003130+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "quill-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:28.006134+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-b\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-b"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "quill-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:28.007649+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-b\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-b"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "quill-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:28.017176+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:27.990116Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    }
+  ],
+  "checks": [],
+  "cleanup": [
+    {
+      "agent": "qual-a",
+      "deletedIds": [
+        "80fd6995-fceb-4cc5-bf97-46ddefc1a827"
+      ],
+      "verifiedEmpty": true
+    },
+    {
+      "agent": "qual-b",
+      "deletedIds": [],
+      "verifiedEmpty": true
+    }
+  ],
+  "error": {
+    "type": "AssertionError",
+    "message": "Recall CLI failed"
+  },
+  "failedStage": {
+    "caseId": "q22",
+    "actions": [
+      {
+        "key": "bag",
+        "op": "store",
+        "result": {
+          "action": "added",
+          "embeddingStatus": "skipped_no_provider",
+          "gateResult": "accepted",
+          "memory": {
+            "content": "Quill shipping bag routing label is BAG_PLUM.",
+            "createdAt": "2026-10-23T03:20:27.166970300+00:00",
+            "id": "80fd6995-fceb-4cc5-bf97-46ddefc1a827",
+            "importance": 0.8999999761581421,
+            "memoryType": "observation",
+            "provenance": "user-stated",
+            "reliability": 1.0,
+            "state": "active",
+            "tags": [],
+            "updatedAt": "2026-10-23T03:20:27.166970300+00:00"
+          },
+          "namespace": "qual-a"
+        }
+      }
+    ],
+    "checks": [
+      {
+        "name": "fresh-mcp-id-and-search",
+        "passed": true
+      }
+    ],
+    "sessionId": "quill-q22-fresh",
+    "turnId": "q22",
+    "cliDiagnostic": {
+      "exitCode": 1,
+      "response": {
+        "schemaVersion": "elegy.cli/v1",
+        "correlationId": "elegy-memory-20944-1792725627633422500",
+        "nonInteractive": true,
+        "command": [
+          "contextual-recall"
+        ],
+        "status": "invalid",
+        "failure": {
+          "code": "CLI-INVALID-INPUT",
+          "message": "contextual recall rejected or unavailable",
+          "category": "invalidInput",
+          "retryable": false,
+          "correlationId": "elegy-memory-20944-1792725627633422500",
+          "details": null,
+          "cause": null
+        }
+      },
+      "stderr": ""
+    }
+  },
+  "completedAt": "2026-10-23T03:20:28.017176+00:00",
+  "mappings": {
+    "bag": {
+      "id": "80fd6995-fceb-4cc5-bf97-46ddefc1a827",
+      "text": "Quill shipping bag routing label is BAG_PLUM.",
+      "agent": "qual-a",
+      "deleted": false
+    }
+  }
+}

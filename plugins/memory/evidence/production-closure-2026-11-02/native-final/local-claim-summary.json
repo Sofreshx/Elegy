@@ -1,0 +1,89 @@
+{
+  "stage": "fresh-local-claim-store-native-context",
+  "sourceRevision": "ef50a694238081527e2a28baa31f2e43691b8c2b",
+  "executions": [
+    {
+      "name": "recall-contract",
+      "exitCode": 0,
+      "status": "ok",
+      "dataKeys": [
+        "checks",
+        "claimId",
+        "context",
+        "createdAt",
+        "durationMs",
+        "id",
+        "measurements",
+        "observation",
+        "outcome",
+        "protocolSha256",
+        "provenance",
+        "schemaVersion",
+        "sequence"
+      ]
+    },
+    {
+      "name": "forgetting-retention",
+      "exitCode": 0,
+      "status": "ok",
+      "dataKeys": [
+        "checks",
+        "claimId",
+        "context",
+        "createdAt",
+        "durationMs",
+        "id",
+        "measurements",
+        "observation",
+        "outcome",
+        "protocolSha256",
+        "provenance",
+        "schemaVersion",
+        "sequence"
+      ]
+    },
+    {
+      "name": "status",
+      "exitCode": 0,
+      "status": "ok",
+      "dataKeys": [
+        "buildMatchesSource",
+        "claims",
+        "inventoryVersion",
+        "readinessPromotion",
+        "rebuildRequired",
+        "schemaVersion",
+        "storage"
+      ]
+    },
+    {
+      "name": "next",
+      "exitCode": 0,
+      "status": "ok",
+      "dataKeys": [
+        "buildMatchesSource",
+        "next",
+        "rebuildRequired",
+        "schemaVersion"
+      ]
+    },
+    {
+      "name": "history",
+      "exitCode": 0,
+      "status": "ok",
+      "dataKeys": null
+    }
+  ],
+  "receiptCount": 2,
+  "ledgerEntries": 2,
+  "outcomes": {
+    "recall.contract": "satisfied",
+    "forgetting.retention": "satisfied"
+  },
+  "evidenceDirectory": "local-claims-native-context",
+  "externalClaimsMarkedSatisfied": false,
+  "realMemoryDatabaseOrConfigUsed": false,
+  "failedRestrictedAttemptPreserved": "local-claims",
+  "gitHeadAtExecution": "ef50a694238081527e2a28baa31f2e43691b8c2b",
+  "gitDirtyAtExecution": true
+}

@@ -1,0 +1,401 @@
+{
+  "schemaVersion": "memory-native-closed-stage-verification/v1",
+  "status": "closed-stages-verified-final-campaign-pending",
+  "checks": [
+    {
+      "name": "receipt-ledger:3eee16ec-8e70-442f-b2e0-c081896ef5fa",
+      "passed": true,
+      "detail": {
+        "receiptSha256": "ff94f37ba1c4db1e6158273853dfc441c2952639c02944739d6a3e15b02c6e0a",
+        "wrapperFileSha256": "475a166e957b4f1049bf8053fbda5e3c8bda89a44acc3fd15e16f7ba2e2b7ef2",
+        "claimId": "recall.contract",
+        "outcome": "satisfied"
+      }
+    },
+    {
+      "name": "receipt-ledger:9dc805d8-c719-45d7-9001-8ee49dd80725",
+      "passed": true,
+      "detail": {
+        "receiptSha256": "9a9c902fe22ad2bda21bcc078f2bf2942c36557326ad0a4bbe95a61102805316",
+        "wrapperFileSha256": "500f55bab62d42b69a6b0d44de44553060b8bfa675e6446efada432af2a9640f",
+        "claimId": "forgetting.retention",
+        "outcome": "satisfied"
+      }
+    },
+    {
+      "name": "failed-pending-original-bytes",
+      "passed": true,
+      "detail": {
+        "receiptPayloadSha256": "6232e5611b8c97afd8e8edda4f238e3302a62b864176d8892c8f909502be33a9",
+        "pendingFileSha256": "ac35525050ce8b6524d9df1d39b7d0c765eac49c063229f34033d66320c704a9",
+        "notPublishedReceipt": true,
+        "noLedgerCreated": true
+      }
+    },
+    {
+      "name": "local-claims-satisfied-only",
+      "passed": true,
+      "detail": {
+        "localClaims": 2,
+        "externalClaimsMarkedSatisfied": false
+      }
+    },
+    {
+      "name": "recorded-publication-failure",
+      "passed": true,
+      "detail": {
+        "status": "error",
+        "failedStoreNotRepaired": true
+      }
+    },
+    {
+      "name": "native-packet:q01",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q02",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q03",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "cleanup:cedar:qual-a",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "cleanup:cedar:qual-b",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "native-packet:q04",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q05",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q06",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "cleanup:lumen:qual-a",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "cleanup:lumen:qual-b",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "native-packet:q07",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q08",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q09",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "cleanup:ares:qual-a",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "cleanup:ares:qual-b",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "native-packet:q10",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q11",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q12",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "cleanup:sable:qual-a",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "cleanup:sable:qual-b",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "native-packet:q13",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q14",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q15",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "cleanup:galen:qual-a",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "cleanup:galen:qual-b",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "native-packet:q16",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q17",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q18",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "cleanup:harbor:qual-a",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "cleanup:harbor:qual-b",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "native-packet:q19",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q20",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q21",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "cleanup:vesper:qual-a",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "cleanup:vesper:qual-b",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "native-packet:q22",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q23",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q24",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches200Bytes": true,
+        "contextOverlayApplied": false
+      }
+    },
+    {
+      "name": "cleanup:quill:qual-a",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "cleanup:quill:qual-b",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "native-replay-inventory",
+      "passed": true,
+      "detail": {
+        "episodes": 8,
+        "packets": 24,
+        "emptyNamespaces": 16
+      }
+    },
+    {
+      "name": "benchmark-binding",
+      "passed": true,
+      "detail": {
+        "p50": 241.791,
+        "p95": 325.34590000000003,
+        "max": 375.2361,
+        "modelAnswerAcceptance": "pending"
+      }
+    }
+  ],
+  "modelAnswersReadOrEvaluated": false,
+  "method": "Offline ledger/payload SHA-256, recorded publication failure, native prefix in exact packets, source invariants, cleanup and benchmark bindings. No actual database, replay or model call."
+}

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "memory-timed-answer-packet/v1",
+  "caseId": "q01",
+  "arm": "without",
+  "valid": true,
+  "exitCode": 0,
+  "startedAt": 1791139116472.321,
+  "observedCompletedAt": 1791139128753.815,
+  "elapsedMs": 12282.336,
+  "answer": "UNKNOWN",
+  "usage": {
+    "input_tokens": 20430,
+    "cached_input_tokens": 9984,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 5,
+    "reasoning_output_tokens": 0
+  },
+  "metadata": {
+    "events": 4,
+    "ids": {
+      "thread_id": "bfd9074ece2e0a98"
+    }
+  },
+  "issues": [],
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a10835-f711-77f0-8ebe-4a107a5121a2\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"UNKNOWN\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20430,\"cached_input_tokens\":9984,\"cache_write_input_tokens\":0,\"output_tokens\":5,\"reasoning_output_tokens\":0}}\n",
+  "stderr": "2026-10-04T18:38:36.832014Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "command": [
+    "<local-path>\\AppData\\Local\\OpenAI\\Codex\\bin\\8aaf1547b825b104\\codex.EXE",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<local-path>\\q01_without",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ],
+  "inputSha256": "2e936b4aadb010f88bdf68e83528bfa14e692d57ddad76aa62153f864b87f0ef",
+  "configArgHash": "fe089f098e3ced78bfadd415505361cf17c107bd5c27eee7483f2cc1c4e5a11a",
+  "timestamp": "2026-10-04T18:38:48.754824+00:00"
+}

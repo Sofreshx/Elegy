@@ -1,0 +1,114 @@
+{
+  "sha256": "2a1c9cc903969e136f003292b6e058dd2326c277835a2b6d93bf41e45097db8d",
+  "receipt": {
+    "schemaVersion": "memory-qualification/v1",
+    "id": "9186c17b-6dab-488a-8331-65427506b85a",
+    "sequence": 1,
+    "claimId": "recall.contract",
+    "protocolSha256": "a757c879bee388bd8cc5b6c64ed7ab97b00a9d6dfc37316a744b73c6416c919b",
+    "createdAt": "2026-11-02T14:04:15.938596100Z",
+    "context": {
+      "sourceSha256": "b5d0c0c258c886ddeb507790553a57144ea0136a889a6649802c84a5910c3955",
+      "buildSourceSha256": "b5d0c0c258c886ddeb507790553a57144ea0136a889a6649802c84a5910c3955",
+      "executableSha256": "989c537e201cbc9cabfd69af416b002a4cf00cb777fa3da61a5455a4cf41795d",
+      "gitRevision": "5c246906c7edf7fb876901b610d1de8352307715",
+      "dirty": false,
+      "os": "windows",
+      "arch": "x86_64"
+    },
+    "provenance": "local-scenario",
+    "outcome": "satisfied",
+    "checks": [
+      {
+        "name": "positive-control",
+        "passed": true,
+        "detail": "Synthetic cobalt fact is recalled."
+      },
+      {
+        "name": "context-budget",
+        "passed": true,
+        "detail": "506 UTF-8 bytes"
+      },
+      {
+        "name": "agent-owner-isolation",
+        "passed": true,
+        "detail": "0 selected records"
+      },
+      {
+        "name": "sensitivity-isolation",
+        "passed": true,
+        "detail": "0 selected records"
+      },
+      {
+        "name": "tenant-owner-isolation",
+        "passed": true,
+        "detail": "0 selected records"
+      },
+      {
+        "name": "user-owner-isolation",
+        "passed": true,
+        "detail": "0 selected records"
+      },
+      {
+        "name": "scope-isolation",
+        "passed": true,
+        "detail": "0 selected records"
+      },
+      {
+        "name": "turn-retry",
+        "passed": true,
+        "detail": "Same turn retains event identity without duplicate injection."
+      },
+      {
+        "name": "feedback-retry",
+        "passed": true,
+        "detail": "Dismiss recorded once."
+      },
+      {
+        "name": "conflicting-feedback",
+        "passed": true,
+        "detail": "A useful judgment cannot replace the recorded dismiss."
+      },
+      {
+        "name": "injected-dismiss-suppression",
+        "passed": true,
+        "detail": "Dismiss restores suppression after removing automatic injection suppression in the disposable fixture."
+      },
+      {
+        "name": "suppression-session-boundary",
+        "passed": true,
+        "detail": "A new session can recall the fact again."
+      },
+      {
+        "name": "journal-header",
+        "passed": true,
+        "detail": "applicationId=1162302019; userVersion=1"
+      },
+      {
+        "name": "journal-version-rejection",
+        "passed": true,
+        "detail": "Unsupported journal version rejected."
+      },
+      {
+        "name": "journal-identity-rejection",
+        "passed": true,
+        "detail": "Foreign journal identity rejected."
+      },
+      {
+        "name": "source-unchanged",
+        "passed": true,
+        "detail": "Closed source database bytes unchanged by recall and feedback."
+      }
+    ],
+    "measurements": {
+      "contextBytes": 506,
+      "fixture": "recall-contract-v1",
+      "journalApplicationId": 1162302019,
+      "journalVersion": 1,
+      "scope": "synthetic library contract; does not attest a host installation or cross-client persistence",
+      "sourceBytes": 266240
+    },
+    "durationMs": 4988,
+    "observation": null
+  }
+}

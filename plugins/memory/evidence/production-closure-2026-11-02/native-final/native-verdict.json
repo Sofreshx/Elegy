@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "memory-native-prefix-acceptance/v1",
+  "label": "NATIVE PREFIX QUALIFICATION",
+  "status": "REFUTED",
+  "completedAt": "2026-11-02T13:19:58.562277+00:00",
+  "criteria": [
+    {
+      "criterion": "all48ValidNoTools",
+      "passed": true
+    },
+    {
+      "criterion": "q08Explicit11DayRetention",
+      "passed": true
+    },
+    {
+      "criterion": "q09IdentifierUnknownWithoutRunbookSubstitution",
+      "passed": true
+    },
+    {
+      "criterion": "q17AndQ18Correct",
+      "passed": true
+    },
+    {
+      "criterion": "allNegativeControlsContinuePass",
+      "passed": true,
+      "detail": "Current overrides, hostile record, private marker, unknown fields, irrelevant fact and deletion controls pass on grounded review; frozen q15/q24 wording mismatches retained."
+    },
+    {
+      "criterion": "noNewSemanticErrorsAmong22PreviouslyCorrectCases",
+      "passed": false,
+      "failedCases": [
+        "q19"
+      ]
+    },
+    {
+      "criterion": "all24WithRecallSemanticallyComplete",
+      "passed": false,
+      "actual": 23,
+      "required": 24
+    },
+    {
+      "criterion": "frozenMeanMinimum",
+      "passed": true,
+      "actual": 0.875,
+      "minimum": 0.8402777778,
+      "tolerance": 1e-06
+    },
+    {
+      "criterion": "atLeast19FullyLexicalCorrect",
+      "passed": true,
+      "actual": 21,
+      "required": 19
+    },
+    {
+      "criterion": "positiveFreshPairedMeanDifference",
+      "passed": true,
+      "actual": 0.5763888888888888
+    }
+  ],
+  "predeclarationSha256": "35f86625ce44764650e2560b2c317403e25efe6f1dbf43088bf6bf8ba51b9c8d",
+  "cleanHeadBindingSha256": "c0e96382dfc45cbbd8e4828d3de3b3660546c38f657aa7002e0fe65ff9224198",
+  "nativePrefixSha256": "c0b4adc6caff9c3fa8231c260efd14866e13fe4b760a78354d7195a10553e3c1",
+  "contextOverlayApplied": false,
+  "candidateChanged": false,
+  "thresholdsOrRubricChanged": false,
+  "modelRetries": 0,
+  "sourceRevision": "ef50a694238081527e2a28baa31f2e43691b8c2b",
+  "assessmentSha256": "b3b3060ae10086a48f8175d40b82dd69217f2ca3345599e7dc9da568462231ce",
+  "semanticReviewSha256": "f6bad3153e74a4f644d59bb62591da2e30b5b7a75c5b26eeeb5ec005c3f60cb4",
+  "frozenGateStatus": "review-required",
+  "frozenGateExitCode": 1,
+  "frozenCriticalCases": [],
+  "limits": "One known-corpus native replay and hosted-model realization; strong all-case semantic acceptance failed. Mechanical and local-claim satisfaction are separate.",
+  "artifactDisposition": "REJECTED CANDIDATE PROOF; not the final production runtime",
+  "productionPrefixAccepted": false,
+  "rootDecision": "Withhold the 200-byte prefix from production; restore the original 202-byte header; preserve this adverse native result. Future production artifact checks are provider-free only."
+}

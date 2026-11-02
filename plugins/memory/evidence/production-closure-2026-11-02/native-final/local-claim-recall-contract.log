@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "elegy.cli/v1",
+  "correlationId": "elegy-memory-10480-1793624877384417100",
+  "nonInteractive": true,
+  "command": [
+    "eval.run"
+  ],
+  "status": "error",
+  "failure": {
+    "code": "CLI-RUNTIME-FAILURE",
+    "message": "Access is denied. (os error 5)",
+    "category": "internal",
+    "retryable": false,
+    "correlationId": "elegy-memory-10480-1793624877384417100",
+    "details": null,
+    "cause": null
+  }
+}

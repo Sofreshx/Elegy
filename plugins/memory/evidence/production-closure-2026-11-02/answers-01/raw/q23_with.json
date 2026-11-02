@@ -1,0 +1,43 @@
+{
+  "answer": "Pour cet envoi, le label de routage du sac Quill est **BAG_AZURE**.",
+  "threadId": "01a19c23-3a23-7bb3-be04-484ee63f9f15",
+  "usage": {
+    "input_tokens": 21042,
+    "cached_input_tokens": 16512,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 48,
+    "reasoning_output_tokens": 19
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a19c23-3a23-7bb3-be04-484ee63f9f15\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Pour cet envoi, le label de routage du sac Quill est **BAG_AZURE**.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":21042,\"cached_input_tokens\":16512,\"cache_write_input_tokens\":0,\"output_tokens\":48,\"reasoning_output_tokens\":19}}\n",
+  "stderr": "2026-11-02T12:01:56.786867Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q23",
+  "arm": "with",
+  "startedAt": "2026-11-02T12:01:56.347133+00:00",
+  "completedAt": "2026-11-02T12:02:04.581852+00:00",
+  "elapsedMs": 8235.046,
+  "promptSha256": "6745e67612f608fa10588d65bc228764c0c615a6298ea53a433386e2ecfd0577",
+  "configurationSha256": "b9206274c525e55b519b8f84f435cbc9d2cec51d2bea53ac7d98b13be5982348",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

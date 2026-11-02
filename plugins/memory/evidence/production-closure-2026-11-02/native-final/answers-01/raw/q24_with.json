@@ -1,0 +1,43 @@
+{
+  "answer": "L’information n’est plus disponible : aucun label de routage du sac n’a été fourni pour cette session.",
+  "threadId": "01a19c67-5d72-7d73-b1b0-507ac35b5cf1",
+  "usage": {
+    "input_tokens": 20866,
+    "cached_input_tokens": 16512,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 57,
+    "reasoning_output_tokens": 29
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a19c67-5d72-7d73-b1b0-507ac35b5cf1\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"L’information n’est plus disponible : aucun label de routage du sac n’a été fourni pour cette session.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20866,\"cached_input_tokens\":16512,\"cache_write_input_tokens\":0,\"output_tokens\":57,\"reasoning_output_tokens\":29}}\n",
+  "stderr": "2026-11-02T13:16:22.275009Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q24",
+  "arm": "with",
+  "startedAt": "2026-11-02T13:16:21.780469+00:00",
+  "completedAt": "2026-11-02T13:16:28.668330+00:00",
+  "elapsedMs": 6888.194,
+  "promptSha256": "1a0ee763569fecda1f0da74fc7443a101baa7beeff810d2d62bfa8c39d5c8f4d",
+  "configurationSha256": "b9206274c525e55b519b8f84f435cbc9d2cec51d2bea53ac7d98b13be5982348",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

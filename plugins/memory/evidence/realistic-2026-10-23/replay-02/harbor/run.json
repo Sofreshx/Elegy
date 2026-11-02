@@ -1,0 +1,818 @@
+{
+  "schemaVersion": "memory-replay-episode/v1",
+  "id": "harbor",
+  "startedAt": "2026-10-23T03:20:12.349983+00:00",
+  "status": "failed",
+  "stages": [],
+  "rpc": [
+    {
+      "client": "q16-write-replay",
+      "timestamp": "2026-10-23T03:20:12.860614+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 515.0
+    },
+    {
+      "client": "q16-write-replay",
+      "timestamp": "2026-10-23T03:20:12.860614+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q16-write-replay",
+      "timestamp": "2026-10-23T03:20:12.865183+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_store",
+          "arguments": {
+            "content": "Harbor payment webhook replay cache TTL is 90 minutes; deduplication strategy is REPLAY_PINE.",
+            "importance": 0.9,
+            "provenance": "user-stated"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"action\":\"added\",\"embeddingStatus\":\"skipped_no_provider\",\"gateResult\":\"accepted\",\"memory\":{\"content\":\"Harbor payment webhook replay cache TTL is 90 minutes; deduplication strategy is REPLAY_PINE.\",\"createdAt\":\"2026-10-23T03:20:12.863242500+00:00\",\"id\":\"bc727820-0326-4609-a2e3-6dcbc1047805\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:20:12.863242500+00:00\"},\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "action": "added",
+            "embeddingStatus": "skipped_no_provider",
+            "gateResult": "accepted",
+            "memory": {
+              "content": "Harbor payment webhook replay cache TTL is 90 minutes; deduplication strategy is REPLAY_PINE.",
+              "createdAt": "2026-10-23T03:20:12.863242500+00:00",
+              "id": "bc727820-0326-4609-a2e3-6dcbc1047805",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:20:12.863242500+00:00"
+            },
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q16-write-replay",
+      "timestamp": "2026-10-23T03:20:13.003230+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:12.371612Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "q16-write-other",
+      "timestamp": "2026-10-23T03:20:13.034630+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 31.0
+    },
+    {
+      "client": "q16-write-other",
+      "timestamp": "2026-10-23T03:20:13.034630+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q16-write-other",
+      "timestamp": "2026-10-23T03:20:13.104462+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_store",
+          "arguments": {
+            "content": "Harbor-Sandbox replay cache TTL is 30 minutes; strategy is REPLAY_BIRCH.",
+            "importance": 0.9,
+            "provenance": "user-stated"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"action\":\"added\",\"embeddingStatus\":\"skipped_no_provider\",\"gateResult\":\"accepted\",\"memory\":{\"content\":\"Harbor-Sandbox replay cache TTL is 30 minutes; strategy is REPLAY_BIRCH.\",\"createdAt\":\"2026-10-23T03:20:13.037530700+00:00\",\"id\":\"835543c9-b64d-4f13-ac5b-194242df2aef\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:20:13.037530700+00:00\"},\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "action": "added",
+            "embeddingStatus": "skipped_no_provider",
+            "gateResult": "accepted",
+            "memory": {
+              "content": "Harbor-Sandbox replay cache TTL is 30 minutes; strategy is REPLAY_BIRCH.",
+              "createdAt": "2026-10-23T03:20:13.037530700+00:00",
+              "id": "835543c9-b64d-4f13-ac5b-194242df2aef",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:20:13.037530700+00:00"
+            },
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 63.0
+    },
+    {
+      "client": "q16-write-other",
+      "timestamp": "2026-10-23T03:20:13.264340+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:13.022762Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "q16-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:13.294509+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 15.0
+    },
+    {
+      "client": "q16-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:13.294509+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q16-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:13.297516+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_recall",
+          "arguments": {
+            "id": "bc727820-0326-4609-a2e3-6dcbc1047805"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"found\":true,\"memory\":{\"content\":\"Harbor payment webhook replay cache TTL is 90 minutes; deduplication strategy is REPLAY_PINE.\",\"createdAt\":\"2026-10-23T03:20:12.863242500+00:00\",\"id\":\"bc727820-0326-4609-a2e3-6dcbc1047805\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:20:12.863242500+00:00\"},\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "found": true,
+            "memory": {
+              "content": "Harbor payment webhook replay cache TTL is 90 minutes; deduplication strategy is REPLAY_PINE.",
+              "createdAt": "2026-10-23T03:20:12.863242500+00:00",
+              "id": "bc727820-0326-4609-a2e3-6dcbc1047805",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:20:12.863242500+00:00"
+            },
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 16.0
+    },
+    {
+      "client": "q16-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:13.369044+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_search",
+          "arguments": {
+            "query": "Harbor payment webhook replay cache TTL is 90 minutes; deduplication strategy is REPLAY_PINE.",
+            "limit": 100
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":1,\"includeDormant\":false,\"namespace\":\"qual-a\",\"query\":\"Harbor payment webhook replay cache TTL is 90 minutes; deduplication strategy is REPLAY_PINE.\",\"results\":[{\"id\":\"bc727820-0326-4609-a2e3-6dcbc1047805\",\"memoryType\":\"observation\",\"preview\":\"Harbor payment webhook replay cache TTL is 90 minutes; deduplication strategy is REPLAY_PINE.\",\"score\":1.0126420259475708,\"similarity\":1.0,\"state\":\"active\"}]}"
+            }
+          ],
+          "structuredContent": {
+            "count": 1,
+            "includeDormant": false,
+            "namespace": "qual-a",
+            "query": "Harbor payment webhook replay cache TTL is 90 minutes; deduplication strategy is REPLAY_PINE.",
+            "results": [
+              {
+                "id": "bc727820-0326-4609-a2e3-6dcbc1047805",
+                "memoryType": "observation",
+                "preview": "Harbor payment webhook replay cache TTL is 90 minutes; deduplication strategy is REPLAY_PINE.",
+                "score": 1.0126420259475708,
+                "similarity": 1.0,
+                "state": "active"
+              }
+            ]
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 62.0
+    },
+    {
+      "client": "q16-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:13.502786+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:13.283454Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "harbor-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:13.612630+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 31.0
+    },
+    {
+      "client": "harbor-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:13.612630+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "harbor-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:13.616144+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":2,\"includeDormant\":true,\"memories\":[{\"id\":\"835543c9-b64d-4f13-ac5b-194242df2aef\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"preview\":\"Harbor-Sandbox replay cache TTL is 30 minutes; strategy is REPLAY_BIRCH.\",\"provenance\":\"user-stated\",\"state\":\"active\",\"updatedAt\":\"2026-10-23T03:20:13.037530700+00:00\"},{\"id\":\"bc727820-0326-4609-a2e3-6dcbc1047805\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"preview\":\"Harbor payment webhook replay cache TTL is 90 minutes; deduplication strategy is REPLAY_PINE.\",\"provenance\":\"user-stated\",\"state\":\"active\",\"updatedAt\":\"2026-10-23T03:20:12.863242500+00:00\"}],\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 2,
+            "includeDormant": true,
+            "memories": [
+              {
+                "id": "835543c9-b64d-4f13-ac5b-194242df2aef",
+                "importance": 0.8999999761581421,
+                "memoryType": "observation",
+                "preview": "Harbor-Sandbox replay cache TTL is 30 minutes; strategy is REPLAY_BIRCH.",
+                "provenance": "user-stated",
+                "state": "active",
+                "updatedAt": "2026-10-23T03:20:13.037530700+00:00"
+              },
+              {
+                "id": "bc727820-0326-4609-a2e3-6dcbc1047805",
+                "importance": 0.8999999761581421,
+                "memoryType": "observation",
+                "preview": "Harbor payment webhook replay cache TTL is 90 minutes; deduplication strategy is REPLAY_PINE.",
+                "provenance": "user-stated",
+                "state": "active",
+                "updatedAt": "2026-10-23T03:20:12.863242500+00:00"
+              }
+            ],
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "harbor-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:13.686627+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_delete",
+          "arguments": {
+            "id": "835543c9-b64d-4f13-ac5b-194242df2aef"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"deleted\":true,\"id\":\"835543c9-b64d-4f13-ac5b-194242df2aef\",\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "deleted": true,
+            "id": "835543c9-b64d-4f13-ac5b-194242df2aef",
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 78.0
+    },
+    {
+      "client": "harbor-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:13.687663+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 4,
+        "params": {
+          "name": "memory_delete",
+          "arguments": {
+            "id": "bc727820-0326-4609-a2e3-6dcbc1047805"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"deleted\":true,\"id\":\"bc727820-0326-4609-a2e3-6dcbc1047805\",\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "deleted": true,
+            "id": "bc727820-0326-4609-a2e3-6dcbc1047805",
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "harbor-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:13.689171+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 5,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "harbor-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:13.861642+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:13.600302Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "harbor-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:13.895817+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 32.0
+    },
+    {
+      "client": "harbor-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:13.895817+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "harbor-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:13.898405+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-b\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-b"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "harbor-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:13.899430+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-b\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-b"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "harbor-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:13.909404+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:13.882666Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    }
+  ],
+  "checks": [],
+  "cleanup": [
+    {
+      "agent": "qual-a",
+      "deletedIds": [
+        "835543c9-b64d-4f13-ac5b-194242df2aef",
+        "bc727820-0326-4609-a2e3-6dcbc1047805"
+      ],
+      "verifiedEmpty": true
+    },
+    {
+      "agent": "qual-b",
+      "deletedIds": [],
+      "verifiedEmpty": true
+    }
+  ],
+  "error": {
+    "type": "AssertionError",
+    "message": "Recall CLI failed"
+  },
+  "failedStage": {
+    "caseId": "q16",
+    "actions": [
+      {
+        "key": "replay",
+        "op": "store",
+        "result": {
+          "action": "added",
+          "embeddingStatus": "skipped_no_provider",
+          "gateResult": "accepted",
+          "memory": {
+            "content": "Harbor payment webhook replay cache TTL is 90 minutes; deduplication strategy is REPLAY_PINE.",
+            "createdAt": "2026-10-23T03:20:12.863242500+00:00",
+            "id": "bc727820-0326-4609-a2e3-6dcbc1047805",
+            "importance": 0.8999999761581421,
+            "memoryType": "observation",
+            "provenance": "user-stated",
+            "reliability": 1.0,
+            "state": "active",
+            "tags": [],
+            "updatedAt": "2026-10-23T03:20:12.863242500+00:00"
+          },
+          "namespace": "qual-a"
+        }
+      },
+      {
+        "key": "other",
+        "op": "store",
+        "result": {
+          "action": "added",
+          "embeddingStatus": "skipped_no_provider",
+          "gateResult": "accepted",
+          "memory": {
+            "content": "Harbor-Sandbox replay cache TTL is 30 minutes; strategy is REPLAY_BIRCH.",
+            "createdAt": "2026-10-23T03:20:13.037530700+00:00",
+            "id": "835543c9-b64d-4f13-ac5b-194242df2aef",
+            "importance": 0.8999999761581421,
+            "memoryType": "observation",
+            "provenance": "user-stated",
+            "reliability": 1.0,
+            "state": "active",
+            "tags": [],
+            "updatedAt": "2026-10-23T03:20:13.037530700+00:00"
+          },
+          "namespace": "qual-a"
+        }
+      }
+    ],
+    "checks": [
+      {
+        "name": "fresh-mcp-id-and-search",
+        "passed": true
+      }
+    ],
+    "sessionId": "harbor-q16-fresh",
+    "turnId": "q16",
+    "cliDiagnostic": {
+      "exitCode": 1,
+      "response": {
+        "schemaVersion": "elegy.cli/v1",
+        "correlationId": "elegy-memory-17220-1792725613561568100",
+        "nonInteractive": true,
+        "command": [
+          "contextual-recall"
+        ],
+        "status": "invalid",
+        "failure": {
+          "code": "CLI-INVALID-INPUT",
+          "message": "contextual recall rejected or unavailable",
+          "category": "invalidInput",
+          "retryable": false,
+          "correlationId": "elegy-memory-17220-1792725613561568100",
+          "details": null,
+          "cause": null
+        }
+      },
+      "stderr": ""
+    }
+  },
+  "completedAt": "2026-10-23T03:20:13.909404+00:00",
+  "mappings": {
+    "replay": {
+      "id": "bc727820-0326-4609-a2e3-6dcbc1047805",
+      "text": "Harbor payment webhook replay cache TTL is 90 minutes; deduplication strategy is REPLAY_PINE.",
+      "agent": "qual-a",
+      "deleted": false
+    },
+    "other": {
+      "id": "835543c9-b64d-4f13-ac5b-194242df2aef",
+      "text": "Harbor-Sandbox replay cache TTL is 30 minutes; strategy is REPLAY_BIRCH.",
+      "agent": "qual-a",
+      "deleted": false
+    }
+  }
+}

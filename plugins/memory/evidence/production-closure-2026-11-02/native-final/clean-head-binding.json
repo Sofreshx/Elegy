@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "memory-native-clean-head-binding/v1",
+  "boundAt": "2026-11-02T13:02:26.689875+00:00",
+  "rootExplicitGoReceived": true,
+  "sourceRevision": "ef50a694238081527e2a28baa31f2e43691b8c2b",
+  "sourceClean": true,
+  "approvedPrefixCommit": "686fcb59055cf072140fee58418ede873d3d14c1",
+  "approvedPrefixCommitIsAncestor": true,
+  "predeclarationSha256": "35f86625ce44764650e2560b2c317403e25efe6f1dbf43088bf6bf8ba51b9c8d",
+  "predeclarationUnchanged": true,
+  "orchestrators": {
+    "native_pipeline.py": "074cabe55dc06f63370688b2256159b9571d10ef3a4065fa36cb4d6e0c993521",
+    "current_campaign.py": "222eda2d0fa3e5c679f2f722d43fc4858270edb6ad8b456bfecd72f6a04f942a"
+  },
+  "loadCoordination": "Root holds Cargo, scans, and heavy work until benchmark completion; no universal idle-machine claim"
+}

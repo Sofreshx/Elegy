@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "memory-host-preflight-summary/v1",
+  "rawSha256": "e3d383ef21600b810740c197ab5a41fec66511ba59bf45ad91151fbbba956fe1",
+  "checks": [
+    {
+      "name": "opencode-config-memory-only",
+      "passed": true
+    },
+    {
+      "name": "codex-config-memory-only",
+      "passed": false
+    },
+    {
+      "name": "opencode-resolved-config",
+      "passed": true
+    },
+    {
+      "name": "opencode-free-model-listed",
+      "passed": true
+    },
+    {
+      "name": "codex-chatgpt-auth",
+      "passed": true
+    }
+  ],
+  "limits": "Initial diagnostics included ambient MCP metadata. Raw remains local and ignored; this summary preserves failure without publishing personal configuration. No model calls occurred."
+}

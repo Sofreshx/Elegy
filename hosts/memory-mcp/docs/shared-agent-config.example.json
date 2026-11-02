@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "fictional-agent-a": {
+      "command": "C:/Example/elegy-memory-mcp-stdio.exe",
+      "env": {
+        "ELEGY_DB_PATH": "C:/Example/shared-memory.sqlite3",
+        "ELEGY_MCP_AGENT_ID": "agent-a",
+        "ELEGY_MCP_READ_SCOPE": "agent",
+        "ELEGY_MCP_SHARED_SPACE": "fictional-team",
+        "ELEGY_MCP_SHARED_AGENTS": "[\"agent-a\",\"agent-b\"]",
+        "ELEGY_EMBEDDING_BOOT_POLICY": "off"
+      }
+    },
+    "fictional-agent-b": {
+      "command": "C:/Example/elegy-memory-mcp-stdio.exe",
+      "env": {
+        "ELEGY_DB_PATH": "C:/Example/shared-memory.sqlite3",
+        "ELEGY_MCP_AGENT_ID": "agent-b",
+        "ELEGY_MCP_READ_SCOPE": "agent",
+        "ELEGY_MCP_SHARED_SPACE": "fictional-team",
+        "ELEGY_MCP_SHARED_AGENTS": "[\"agent-a\",\"agent-b\"]",
+        "ELEGY_EMBEDDING_BOOT_POLICY": "off"
+      }
+    }
+  }
+}

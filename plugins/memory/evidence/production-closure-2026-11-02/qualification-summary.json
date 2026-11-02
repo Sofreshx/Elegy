@@ -1,0 +1,178 @@
+{
+  "schemaVersion": "memory-current-source-qualification/v1",
+  "completedAt": "2026-11-02T12:04:02.370859+00:00",
+  "sourceRevision": "cdcb3957b2a3d4b4bfa2eb178f914254cb436dd2",
+  "currentHeadAtCompletion": "cdcb3957b2a3d4b4bfa2eb178f914254cb436dd2",
+  "packageVersion": "0.1.0",
+  "build": {
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "-p",
+      "elegy-memory",
+      "-p",
+      "elegy-memory-mcp",
+      "--bin",
+      "elegy-memory",
+      "--bin",
+      "elegy-memory-mcp-stdio"
+    ],
+    "targetDirectory": "<release-target>",
+    "startedAt": "2026-11-02T11:52:42.300257+00:00",
+    "completedAt": "2026-11-02T11:54:34.179287+00:00",
+    "durationSeconds": 111.879,
+    "exitCode": 0,
+    "profile": "release",
+    "buildMatchesSource": true
+  },
+  "pinnedBinaries": {
+    "elegy-memory.exe": {
+      "sha256": "3f7cc338a8550726e8ed9d11ea2e0eca39bba58deea35e6f37c2d9f58091cc72",
+      "matchesOriginalCleanReleaseBuild": true
+    },
+    "elegy-memory-mcp-stdio.exe": {
+      "sha256": "a4410052a9004234ce9157a2ba39dadaac11dc700d67cfa1799468fd1787918a",
+      "matchesOriginalCleanReleaseBuild": true
+    }
+  },
+  "artifactRestoration": "Exact original clean-build hashes reproduced after benchmark Cargo dependency graph replaced target CLI; pinned copies used for replay.",
+  "currentTreeGloballyClean": false,
+  "postBuildChangedSnapshotPaths": [
+    "hosts/memory-mcp/docs/CONFIG.md"
+  ],
+  "currentCodeInputHashCount": 226,
+  "currentCodeInputsUnchanged": true,
+  "benchmark": {
+    "sourceRevision": "cdcb3957b2a3d4b4bfa2eb178f914254cb436dd2",
+    "result": "release-benchmark.json",
+    "latencyMs": {
+      "max": 415.8057,
+      "p50": 250.1333,
+      "p95": 301.8666
+    },
+    "p95TargetMs": 500,
+    "p95TargetMet": true,
+    "backgroundPublicationScanOverlap": true,
+    "sourceDbWalCountersUnchanged": true
+  },
+  "preflight": {
+    "failedRestrictedAttemptPreserved": "preflight-01",
+    "passedNativeAttempt": "preflight-02",
+    "model": "gpt-5.6-luna",
+    "reasoningEffort": "medium",
+    "noLoginStatusOrQuotaQuery": true
+  },
+  "replay": {
+    "stage": "synthetic-local-replay",
+    "exitCode": 0,
+    "status": "completed",
+    "durationSeconds": 54.339,
+    "episodes": [
+      {
+        "id": "cedar",
+        "status": "completed",
+        "stageCount": 3,
+        "error": null
+      },
+      {
+        "id": "lumen",
+        "status": "completed",
+        "stageCount": 3,
+        "error": null
+      },
+      {
+        "id": "ares",
+        "status": "completed",
+        "stageCount": 3,
+        "error": null
+      },
+      {
+        "id": "sable",
+        "status": "completed",
+        "stageCount": 3,
+        "error": null
+      },
+      {
+        "id": "galen",
+        "status": "completed",
+        "stageCount": 3,
+        "error": null
+      },
+      {
+        "id": "harbor",
+        "status": "completed",
+        "stageCount": 3,
+        "error": null
+      },
+      {
+        "id": "vesper",
+        "status": "completed",
+        "stageCount": 3,
+        "error": null
+      },
+      {
+        "id": "quill",
+        "status": "completed",
+        "stageCount": 3,
+        "error": null
+      }
+    ],
+    "packets": 24,
+    "sourceUnchangedPackets": 24,
+    "cleanupNamespaces": 16,
+    "verifiedEmptyNamespaces": 16,
+    "sourceRevision": "cdcb3957b2a3d4b4bfa2eb178f914254cb436dd2",
+    "pinnedBinariesVerified": true,
+    "currentCodeInputsUnchanged": true
+  },
+  "answers": {
+    "count": 48,
+    "distinctSessions": 48,
+    "inventoryErrors": [],
+    "executionErrors": 0,
+    "frozenMeanWith": 0.8402777777777778,
+    "frozenMeanWithout": 0.2986111111111111,
+    "meanPairedDifference": 0.5416666666666667,
+    "fullyLexicalCorrectWith": 19,
+    "fullyLexicalCorrectWithout": 6,
+    "forbiddenWith": 1,
+    "forbiddenWithout": 0,
+    "gateStatus": "blocked",
+    "criticalCases": [
+      "q09"
+    ]
+  },
+  "semanticReview": {
+    "file": "semantic-review.json",
+    "withComplete": 22,
+    "withoutComplete": 8,
+    "misleading": [
+      "q09"
+    ],
+    "omissions": [
+      "q08"
+    ],
+    "status": "answer-quality-not-qualified-for-autonomous-use"
+  },
+  "frozenHarnessAndCorpusByteIdentical": {
+    "run_replay.py": true,
+    "rpc_support.py": true,
+    "answer_runner.py": true,
+    "grade.py": true,
+    "check_results.py": true,
+    "corpus.json": true
+  },
+  "rubricChanged": false,
+  "modelSubstituted": false,
+  "additionalPaidRouteUsed": false,
+  "realMemoryActivated": false,
+  "limits": [
+    "Known synthetic regression corpus, not an unseen holdout or daily-use trial",
+    "One realization per condition with hosted model alias; current Codex version differs from original campaign",
+    "No statistical generalization or monetary saving claimed",
+    "Answer-quality gate remains blocked; transport/storage/mechanics success is separate",
+    "Current workspace has post-build documentation changes; artifacts remain bound to the original clean source commit"
+  ]
+}

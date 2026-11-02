@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "elegy.cli/v1",
+  "correlationId": "elegy-memory-16112-1791137627980399100",
+  "command": [
+    "eval.next"
+  ],
+  "status": "ok",
+  "data": {
+    "buildMatchesSource": true,
+    "next": {
+      "claim": {
+        "executor": "local-scenario",
+        "falsifier": "A policy misses the budget or the default drops a labelled high-value fact.",
+        "id": "forgetting.retention",
+        "limits": "Small synthetic comparative scenario, not FiFA/MaRS benchmark parity or a universal policy ranking.",
+        "prerequisiteChecks": [],
+        "promise": "All five policies enforce the active-count budget; the default retains the labelled important facts in this fixed scenario.",
+        "protocol": [
+          "Seed identical synthetic memories with fixed IDs, timestamps and utility labels for each policy.",
+          "Run the actual store budget enforcement for every policy.",
+          "Report retained IDs and retention quality per policy; do not select a universal winner."
+        ],
+        "protocolVersion": 1,
+        "requiredChecks": [
+          "importance-reliability.count-budget",
+          "default-policy-identity",
+          "default-labelled-retention",
+          "fifo.count-budget",
+          "lru.count-budget",
+          "priority-decay.count-budget",
+          "random-drop.count-budget"
+        ]
+      },
+      "externalSubjectRequiresRecheck": false,
+      "latestReceipt": "ffc1e506-8c7f-48f9-bd53-2b9808651792",
+      "nextAction": "elegy-memory eval run --claim forgetting.retention --json",
+      "nextInvocation": {
+        "args": [
+          "eval",
+          "run",
+          "--claim",
+          "forgetting.retention",
+          "--project",
+          "\\\\?\\<repo>",
+          "--evidence-dir",
+          "\\\\?\\<repo>\\plugins\\memory\\evidence\\qualification",
+          "--json"
+        ],
+        "program": "elegy-memory"
+      },
+      "observationSchema": null,
+      "protocolSha256": "95708fde4e6a5ddb2002ae3806f4466863577e21575d5453d5b4e8a501045072",
+      "provenance": "local-scenario",
+      "receiptCount": 5,
+      "receiptPath": "receipts/ffc1e506-8c7f-48f9-bd53-2b9808651792.json",
+      "reviewRequired": false,
+      "staleReasons": [
+        "source-changed",
+        "build-source-changed",
+        "executable-changed"
+      ],
+      "status": "stale",
+      "subject": null
+    },
+    "rebuildRequired": false,
+    "schemaVersion": "memory-qualification/v1"
+  }
+}

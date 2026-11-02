@@ -1,0 +1,63 @@
+{
+  "stage": "synthetic-local-replay",
+  "exitCode": 0,
+  "status": "completed",
+  "durationSeconds": 54.339,
+  "episodes": [
+    {
+      "id": "cedar",
+      "status": "completed",
+      "stageCount": 3,
+      "error": null
+    },
+    {
+      "id": "lumen",
+      "status": "completed",
+      "stageCount": 3,
+      "error": null
+    },
+    {
+      "id": "ares",
+      "status": "completed",
+      "stageCount": 3,
+      "error": null
+    },
+    {
+      "id": "sable",
+      "status": "completed",
+      "stageCount": 3,
+      "error": null
+    },
+    {
+      "id": "galen",
+      "status": "completed",
+      "stageCount": 3,
+      "error": null
+    },
+    {
+      "id": "harbor",
+      "status": "completed",
+      "stageCount": 3,
+      "error": null
+    },
+    {
+      "id": "vesper",
+      "status": "completed",
+      "stageCount": 3,
+      "error": null
+    },
+    {
+      "id": "quill",
+      "status": "completed",
+      "stageCount": 3,
+      "error": null
+    }
+  ],
+  "packets": 24,
+  "sourceUnchangedPackets": 24,
+  "cleanupNamespaces": 16,
+  "verifiedEmptyNamespaces": 16,
+  "sourceRevision": "cdcb3957b2a3d4b4bfa2eb178f914254cb436dd2",
+  "pinnedBinariesVerified": true,
+  "currentCodeInputsUnchanged": true
+}

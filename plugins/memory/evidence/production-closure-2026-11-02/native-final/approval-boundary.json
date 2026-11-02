@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "memory-native-approval-boundary/v1",
+  "initialActionRejectedBeforeExecution": true,
+  "reason": "Reviewer could not establish payload sensitivity/export authorization",
+  "proof": "outbound-payload-proof.json",
+  "reconsideration": "Same action transparently reconsidered after exact public-synthetic payload and private-gate verification",
+  "permittedExecutionObserved": true,
+  "alternateRouteUsed": false,
+  "currentNativeCampaignStillRunning": false,
+  "campaignCompleted": true,
+  "all48ActualPromptHashesMatchApprovedProof": true
+}

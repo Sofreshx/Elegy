@@ -1,0 +1,818 @@
+{
+  "schemaVersion": "memory-replay-episode/v1",
+  "id": "sable",
+  "startedAt": "2026-10-23T03:20:09.033989+00:00",
+  "status": "failed",
+  "stages": [],
+  "rpc": [
+    {
+      "client": "q10-write-incident",
+      "timestamp": "2026-10-23T03:20:09.334952+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 297.0
+    },
+    {
+      "client": "q10-write-incident",
+      "timestamp": "2026-10-23T03:20:09.334952+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q10-write-incident",
+      "timestamp": "2026-10-23T03:20:09.338565+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_store",
+          "arguments": {
+            "content": "Sable incident maintenance window starts at 14:20 UTC; escalation group is OPS_IVORY.",
+            "importance": 0.9,
+            "provenance": "user-stated"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"action\":\"added\",\"embeddingStatus\":\"skipped_no_provider\",\"gateResult\":\"accepted\",\"memory\":{\"content\":\"Sable incident maintenance window starts at 14:20 UTC; escalation group is OPS_IVORY.\",\"createdAt\":\"2026-10-23T03:20:09.337499+00:00\",\"id\":\"0af5e510-5c89-4783-8bd7-10e970cbbab0\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:20:09.337499+00:00\"},\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "action": "added",
+            "embeddingStatus": "skipped_no_provider",
+            "gateResult": "accepted",
+            "memory": {
+              "content": "Sable incident maintenance window starts at 14:20 UTC; escalation group is OPS_IVORY.",
+              "createdAt": "2026-10-23T03:20:09.337499+00:00",
+              "id": "0af5e510-5c89-4783-8bd7-10e970cbbab0",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:20:09.337499+00:00"
+            },
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q10-write-incident",
+      "timestamp": "2026-10-23T03:20:09.502481+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:09.052655Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "q10-write-neighbor",
+      "timestamp": "2026-10-23T03:20:09.532721+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 31.0
+    },
+    {
+      "client": "q10-write-neighbor",
+      "timestamp": "2026-10-23T03:20:09.532721+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q10-write-neighbor",
+      "timestamp": "2026-10-23T03:20:09.596523+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_store",
+          "arguments": {
+            "content": "Sable-East maintenance starts at 16:40 UTC; escalation group is OPS_ONYX.",
+            "importance": 0.9,
+            "provenance": "user-stated"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"action\":\"added\",\"embeddingStatus\":\"skipped_no_provider\",\"gateResult\":\"accepted\",\"memory\":{\"content\":\"Sable-East maintenance starts at 16:40 UTC; escalation group is OPS_ONYX.\",\"createdAt\":\"2026-10-23T03:20:09.536039700+00:00\",\"id\":\"9ac3694a-6c80-4c67-8f4b-7c4231b70d64\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:20:09.536039700+00:00\"},\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "action": "added",
+            "embeddingStatus": "skipped_no_provider",
+            "gateResult": "accepted",
+            "memory": {
+              "content": "Sable-East maintenance starts at 16:40 UTC; escalation group is OPS_ONYX.",
+              "createdAt": "2026-10-23T03:20:09.536039700+00:00",
+              "id": "9ac3694a-6c80-4c67-8f4b-7c4231b70d64",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:20:09.536039700+00:00"
+            },
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 63.0
+    },
+    {
+      "client": "q10-write-neighbor",
+      "timestamp": "2026-10-23T03:20:09.761776+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:09.521361Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "q10-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:09.795038+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 15.0
+    },
+    {
+      "client": "q10-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:09.795038+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "q10-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:09.797971+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_recall",
+          "arguments": {
+            "id": "0af5e510-5c89-4783-8bd7-10e970cbbab0"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"found\":true,\"memory\":{\"content\":\"Sable incident maintenance window starts at 14:20 UTC; escalation group is OPS_IVORY.\",\"createdAt\":\"2026-10-23T03:20:09.337499+00:00\",\"id\":\"0af5e510-5c89-4783-8bd7-10e970cbbab0\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"provenance\":\"user-stated\",\"reliability\":1.0,\"state\":\"active\",\"tags\":[],\"updatedAt\":\"2026-10-23T03:20:09.337499+00:00\"},\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "found": true,
+            "memory": {
+              "content": "Sable incident maintenance window starts at 14:20 UTC; escalation group is OPS_IVORY.",
+              "createdAt": "2026-10-23T03:20:09.337499+00:00",
+              "id": "0af5e510-5c89-4783-8bd7-10e970cbbab0",
+              "importance": 0.8999999761581421,
+              "memoryType": "observation",
+              "provenance": "user-stated",
+              "reliability": 1.0,
+              "state": "active",
+              "tags": [],
+              "updatedAt": "2026-10-23T03:20:09.337499+00:00"
+            },
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 16.0
+    },
+    {
+      "client": "q10-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:09.869425+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_search",
+          "arguments": {
+            "query": "Sable incident maintenance window starts at 14:20 UTC; escalation group is OPS_IVORY.",
+            "limit": 100
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":1,\"includeDormant\":false,\"namespace\":\"qual-a\",\"query\":\"Sable incident maintenance window starts at 14:20 UTC; escalation group is OPS_IVORY.\",\"results\":[{\"id\":\"0af5e510-5c89-4783-8bd7-10e970cbbab0\",\"memoryType\":\"observation\",\"preview\":\"Sable incident maintenance window starts at 14:20 UTC; escalation group is OPS_IVORY.\",\"score\":1.0126420259475708,\"similarity\":1.0,\"state\":\"active\"}]}"
+            }
+          ],
+          "structuredContent": {
+            "count": 1,
+            "includeDormant": false,
+            "namespace": "qual-a",
+            "query": "Sable incident maintenance window starts at 14:20 UTC; escalation group is OPS_IVORY.",
+            "results": [
+              {
+                "id": "0af5e510-5c89-4783-8bd7-10e970cbbab0",
+                "memoryType": "observation",
+                "preview": "Sable incident maintenance window starts at 14:20 UTC; escalation group is OPS_IVORY.",
+                "score": 1.0126420259475708,
+                "similarity": 1.0,
+                "state": "active"
+              }
+            ]
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 62.0
+    },
+    {
+      "client": "q10-fresh-mcp",
+      "timestamp": "2026-10-23T03:20:09.970143+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:09.783093Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "sable-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:10.078406+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 31.0
+    },
+    {
+      "client": "sable-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:10.078406+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "sable-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:10.082441+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":2,\"includeDormant\":true,\"memories\":[{\"id\":\"9ac3694a-6c80-4c67-8f4b-7c4231b70d64\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"preview\":\"Sable-East maintenance starts at 16:40 UTC; escalation group is OPS_ONYX.\",\"provenance\":\"user-stated\",\"state\":\"active\",\"updatedAt\":\"2026-10-23T03:20:09.536039700+00:00\"},{\"id\":\"0af5e510-5c89-4783-8bd7-10e970cbbab0\",\"importance\":0.8999999761581421,\"memoryType\":\"observation\",\"preview\":\"Sable incident maintenance window starts at 14:20 UTC; escalation group is OPS_IVORY.\",\"provenance\":\"user-stated\",\"state\":\"active\",\"updatedAt\":\"2026-10-23T03:20:09.337499+00:00\"}],\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 2,
+            "includeDormant": true,
+            "memories": [
+              {
+                "id": "9ac3694a-6c80-4c67-8f4b-7c4231b70d64",
+                "importance": 0.8999999761581421,
+                "memoryType": "observation",
+                "preview": "Sable-East maintenance starts at 16:40 UTC; escalation group is OPS_ONYX.",
+                "provenance": "user-stated",
+                "state": "active",
+                "updatedAt": "2026-10-23T03:20:09.536039700+00:00"
+              },
+              {
+                "id": "0af5e510-5c89-4783-8bd7-10e970cbbab0",
+                "importance": 0.8999999761581421,
+                "memoryType": "observation",
+                "preview": "Sable incident maintenance window starts at 14:20 UTC; escalation group is OPS_IVORY.",
+                "provenance": "user-stated",
+                "state": "active",
+                "updatedAt": "2026-10-23T03:20:09.337499+00:00"
+              }
+            ],
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "sable-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:10.152800+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_delete",
+          "arguments": {
+            "id": "9ac3694a-6c80-4c67-8f4b-7c4231b70d64"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"deleted\":true,\"id\":\"9ac3694a-6c80-4c67-8f4b-7c4231b70d64\",\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "deleted": true,
+            "id": "9ac3694a-6c80-4c67-8f4b-7c4231b70d64",
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 63.0
+    },
+    {
+      "client": "sable-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:10.154838+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 4,
+        "params": {
+          "name": "memory_delete",
+          "arguments": {
+            "id": "0af5e510-5c89-4783-8bd7-10e970cbbab0"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"deleted\":true,\"id\":\"0af5e510-5c89-4783-8bd7-10e970cbbab0\",\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "deleted": true,
+            "id": "0af5e510-5c89-4783-8bd7-10e970cbbab0",
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "sable-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:10.157375+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 5,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-a\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-a"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 15.0
+    },
+    {
+      "client": "sable-qual-a-cleanup",
+      "timestamp": "2026-10-23T03:20:10.323020+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:10.066096Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    },
+    {
+      "client": "sable-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:10.357794+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "qualification-probe",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "elegy-memory-mcp",
+            "title": "Elegy Memory MCP",
+            "version": "0.1.0",
+            "description": "Reusable MCP memory tool surface for Elegy Memory."
+          },
+          "instructions": "This server exposes read/write memory tools inside a caller-configured agent namespace."
+        }
+      },
+      "elapsedMs": 16.0
+    },
+    {
+      "client": "sable-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:10.357794+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "sable-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:10.360814+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 2,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-b\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-b"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 15.0
+    },
+    {
+      "client": "sable-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:10.361825+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "id": 3,
+        "params": {
+          "name": "memory_list",
+          "arguments": {
+            "limit": 1000,
+            "includeDormant": true
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"count\":0,\"includeDormant\":true,\"memories\":[],\"namespace\":\"qual-b\"}"
+            }
+          ],
+          "structuredContent": {
+            "count": 0,
+            "includeDormant": true,
+            "memories": [],
+            "namespace": "qual-b"
+          },
+          "isError": false
+        }
+      },
+      "elapsedMs": 0.0
+    },
+    {
+      "client": "sable-qual-b-cleanup",
+      "timestamp": "2026-10-23T03:20:10.370860+00:00",
+      "process": {
+        "exitCode": 0,
+        "stderr": "{\"timestamp\":\"2026-10-23T03:20:10.344302Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider.\"},\"target\":\"elegy_memory_mcp_stdio\"}\n",
+        "graceful": true,
+        "forced": false
+      }
+    }
+  ],
+  "checks": [],
+  "cleanup": [
+    {
+      "agent": "qual-a",
+      "deletedIds": [
+        "9ac3694a-6c80-4c67-8f4b-7c4231b70d64",
+        "0af5e510-5c89-4783-8bd7-10e970cbbab0"
+      ],
+      "verifiedEmpty": true
+    },
+    {
+      "agent": "qual-b",
+      "deletedIds": [],
+      "verifiedEmpty": true
+    }
+  ],
+  "error": {
+    "type": "AssertionError",
+    "message": "Recall CLI failed"
+  },
+  "failedStage": {
+    "caseId": "q10",
+    "actions": [
+      {
+        "key": "incident",
+        "op": "store",
+        "result": {
+          "action": "added",
+          "embeddingStatus": "skipped_no_provider",
+          "gateResult": "accepted",
+          "memory": {
+            "content": "Sable incident maintenance window starts at 14:20 UTC; escalation group is OPS_IVORY.",
+            "createdAt": "2026-10-23T03:20:09.337499+00:00",
+            "id": "0af5e510-5c89-4783-8bd7-10e970cbbab0",
+            "importance": 0.8999999761581421,
+            "memoryType": "observation",
+            "provenance": "user-stated",
+            "reliability": 1.0,
+            "state": "active",
+            "tags": [],
+            "updatedAt": "2026-10-23T03:20:09.337499+00:00"
+          },
+          "namespace": "qual-a"
+        }
+      },
+      {
+        "key": "neighbor",
+        "op": "store",
+        "result": {
+          "action": "added",
+          "embeddingStatus": "skipped_no_provider",
+          "gateResult": "accepted",
+          "memory": {
+            "content": "Sable-East maintenance starts at 16:40 UTC; escalation group is OPS_ONYX.",
+            "createdAt": "2026-10-23T03:20:09.536039700+00:00",
+            "id": "9ac3694a-6c80-4c67-8f4b-7c4231b70d64",
+            "importance": 0.8999999761581421,
+            "memoryType": "observation",
+            "provenance": "user-stated",
+            "reliability": 1.0,
+            "state": "active",
+            "tags": [],
+            "updatedAt": "2026-10-23T03:20:09.536039700+00:00"
+          },
+          "namespace": "qual-a"
+        }
+      }
+    ],
+    "checks": [
+      {
+        "name": "fresh-mcp-id-and-search",
+        "passed": true
+      }
+    ],
+    "sessionId": "sable-q10-fresh",
+    "turnId": "q10",
+    "cliDiagnostic": {
+      "exitCode": 1,
+      "response": {
+        "schemaVersion": "elegy.cli/v1",
+        "correlationId": "elegy-memory-6632-1792725610025377100",
+        "nonInteractive": true,
+        "command": [
+          "contextual-recall"
+        ],
+        "status": "invalid",
+        "failure": {
+          "code": "CLI-INVALID-INPUT",
+          "message": "contextual recall rejected or unavailable",
+          "category": "invalidInput",
+          "retryable": false,
+          "correlationId": "elegy-memory-6632-1792725610025377100",
+          "details": null,
+          "cause": null
+        }
+      },
+      "stderr": ""
+    }
+  },
+  "completedAt": "2026-10-23T03:20:10.370860+00:00",
+  "mappings": {
+    "incident": {
+      "id": "0af5e510-5c89-4783-8bd7-10e970cbbab0",
+      "text": "Sable incident maintenance window starts at 14:20 UTC; escalation group is OPS_IVORY.",
+      "agent": "qual-a",
+      "deleted": false
+    },
+    "neighbor": {
+      "id": "9ac3694a-6c80-4c67-8f4b-7c4231b70d64",
+      "text": "Sable-East maintenance starts at 16:40 UTC; escalation group is OPS_ONYX.",
+      "agent": "qual-a",
+      "deleted": false
+    }
+  }
+}

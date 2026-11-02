@@ -1,0 +1,25 @@
+{"caseId": "q01", "arm": "with", "valid": true, "elapsedMs": 7292.045}
+{"caseId": "q03", "arm": "with", "valid": true, "elapsedMs": 7332.318}
+{"caseId": "q02", "arm": "with", "valid": true, "elapsedMs": 10866.797}
+{"caseId": "q04", "arm": "with", "valid": true, "elapsedMs": 6210.644}
+{"caseId": "q05", "arm": "with", "valid": true, "elapsedMs": 6870.126}
+{"caseId": "q06", "arm": "with", "valid": true, "elapsedMs": 7225.6}
+{"caseId": "q08", "arm": "with", "valid": true, "elapsedMs": 11046.056}
+{"caseId": "q07", "arm": "with", "valid": true, "elapsedMs": 12095.374}
+{"caseId": "q09", "arm": "with", "valid": true, "elapsedMs": 8255.816}
+{"caseId": "q10", "arm": "with", "valid": true, "elapsedMs": 7101.307}
+{"caseId": "q12", "arm": "with", "valid": true, "elapsedMs": 7163.048}
+{"caseId": "q11", "arm": "with", "valid": true, "elapsedMs": 8558.115}
+{"caseId": "q14", "arm": "with", "valid": true, "elapsedMs": 8146.769}
+{"caseId": "q13", "arm": "with", "valid": true, "elapsedMs": 10986.63}
+{"caseId": "q15", "arm": "with", "valid": true, "elapsedMs": 11393.039}
+{"caseId": "q16", "arm": "with", "valid": true, "elapsedMs": 9284.717}
+{"caseId": "q17", "arm": "with", "valid": true, "elapsedMs": 7828.695}
+{"caseId": "q18", "arm": "with", "valid": true, "elapsedMs": 8532.433}
+{"caseId": "q20", "arm": "with", "valid": true, "elapsedMs": 7519.817}
+{"caseId": "q19", "arm": "with", "valid": true, "elapsedMs": 9628.088}
+{"caseId": "q21", "arm": "with", "valid": true, "elapsedMs": 7464.111}
+{"caseId": "q22", "arm": "with", "valid": true, "elapsedMs": 7831.68}
+{"caseId": "q23", "arm": "with", "valid": true, "elapsedMs": 7191.632}
+{"caseId": "q24", "arm": "with", "valid": true, "elapsedMs": 7060.569}
+{"stage": "experiment-model-calls", "status": "completed", "answerCount": 24}

@@ -16,10 +16,13 @@ rmcp.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt"] }
 
 [dev-dependencies]
-rmcp = { workspace = true, features = ["client", "server", "transport-io"] }
+rmcp = { workspace = true, features = ["client", "server", "transport-child-process", "transport-io"] }
 serde = { workspace = true, features = ["derive"] }
+tempfile = "3.19.1"
 tokio.workspace = true
 
 [[bin]]

@@ -1,0 +1,43 @@
+{
+  "answer": "Pour l’équipe Galen, le label de routage de l’endpoint est `ENDPOINT_TULIP`.",
+  "threadId": "01a19c66-c74c-7ba2-9294-57f06190c3cd",
+  "usage": {
+    "input_tokens": 20902,
+    "cached_input_tokens": 10496,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 47,
+    "reasoning_output_tokens": 18
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a19c66-c74c-7ba2-9294-57f06190c3cd\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Pour l’équipe Galen, le label de routage de l’endpoint est `ENDPOINT_TULIP`.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20902,\"cached_input_tokens\":10496,\"cache_write_input_tokens\":0,\"output_tokens\":47,\"reasoning_output_tokens\":18}}\n",
+  "stderr": "2026-11-02T13:15:43.839037Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q13",
+  "arm": "with",
+  "startedAt": "2026-11-02T13:15:43.353275+00:00",
+  "completedAt": "2026-11-02T13:15:49.446631+00:00",
+  "elapsedMs": 6094.068,
+  "promptSha256": "14634e23a6e9ce6fe76e273ed2d919ef1e1c1493e617b9d9fc75f46f45c15d8a",
+  "configurationSha256": "b9206274c525e55b519b8f84f435cbc9d2cec51d2bea53ac7d98b13be5982348",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

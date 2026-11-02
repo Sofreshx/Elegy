@@ -1,0 +1,251 @@
+{
+  "schemaVersion": "memory-native-prefix-qualification/v1",
+  "completedAt": "2026-11-02T13:19:59.011289+00:00",
+  "status": "REFUTED-ALL-CASE-SEMANTIC-ACCEPTANCE",
+  "sourceRevision": "ef50a694238081527e2a28baa31f2e43691b8c2b",
+  "currentHeadAtEnd": "ef50a694238081527e2a28baa31f2e43691b8c2b",
+  "packageVersion": "0.1.0",
+  "build": {
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "-p",
+      "elegy-memory",
+      "-p",
+      "elegy-memory-mcp",
+      "--bin",
+      "elegy-memory",
+      "--bin",
+      "elegy-memory-mcp-stdio"
+    ],
+    "exitCode": 0,
+    "startedAt": "2026-11-02T13:05:18.192407+00:00",
+    "completedAt": "2026-11-02T13:07:04.234628+00:00",
+    "durationSeconds": 106.042,
+    "profile": "release",
+    "buildMatchesSource": true
+  },
+  "pinnedBinaries": {
+    "elegy-memory": {
+      "sha256": "a583ba9a66a41c111d8b5f00570ae2e527687e10842dc685ffc5d00d29f10bb9",
+      "packageVersion": "0.1.0"
+    },
+    "elegy-memory-mcp-stdio": {
+      "sha256": "0452d71e50ec8cc76c787dac02f12f70fc48ef99d8fa5faa08cfc82bcc5c9298",
+      "packageVersion": "0.1.0"
+    }
+  },
+  "nativePrefixSha256": "c0b4adc6caff9c3fa8231c260efd14866e13fe4b760a78354d7195a10553e3c1",
+  "contextOverlayApplied": false,
+  "benchmark": {
+    "benchmark": "contextual-recall-library-synthetic-v1",
+    "corpus": {
+      "authorizedExpected": 1,
+      "embedding": "none",
+      "forbiddenExactMatches": 4,
+      "lexicalDistractors": 1000,
+      "minSimilarity": 0.800000011920929,
+      "rows": 1005
+    },
+    "environment": {
+      "arch": "x86_64",
+      "availableParallelism": 8,
+      "debugAssertions": false,
+      "os": "windows",
+      "sqliteVersion": "3.46.0"
+    },
+    "journal": {
+      "events": 105,
+      "expectedItems": 105,
+      "sessions": 105
+    },
+    "latencyIsMeasurementOnly": true,
+    "latencyMs": {
+      "max": 375.2361,
+      "p50": 241.791,
+      "p95": 325.34590000000003
+    },
+    "limits": "single local warm lexical workload; no provider, embedding, host-hook, concurrent writer, or production database measurement",
+    "p95TargetMet": true,
+    "p95TargetMs": 500.0,
+    "path": "in-process lexical recall; includes source open, ranking, and journal commit",
+    "sampling": {
+      "freshSessionPerCall": true,
+      "measuredCalls": 100,
+      "percentileMethod": "nearest-rank",
+      "setupAndAssertionsTimed": false,
+      "sharedJournal": true,
+      "warmupCalls": 5
+    },
+    "source": {
+      "bytesUnchanged": true,
+      "countersUnchanged": true,
+      "databaseBytes": 774144,
+      "sha256": "e5b3333faaca416de56d43e7bd1a370dcb3ce218055010a09b12c64845f8aeac",
+      "walBytes": 0,
+      "walUnchanged": true
+    },
+    "sourceRevision": "ef50a694238081527e2a28baa31f2e43691b8c2b",
+    "sourceBinding": "release-source-before.json",
+    "measurementLoad": {
+      "coordinatedNoCompetingBuildOrPublicationScan": true,
+      "universalIdleMachineClaim": false
+    }
+  },
+  "localClaims": {
+    "stage": "fresh-local-claim-store-native-context",
+    "sourceRevision": "ef50a694238081527e2a28baa31f2e43691b8c2b",
+    "executions": [
+      {
+        "name": "recall-contract",
+        "exitCode": 0,
+        "status": "ok",
+        "dataKeys": [
+          "checks",
+          "claimId",
+          "context",
+          "createdAt",
+          "durationMs",
+          "id",
+          "measurements",
+          "observation",
+          "outcome",
+          "protocolSha256",
+          "provenance",
+          "schemaVersion",
+          "sequence"
+        ]
+      },
+      {
+        "name": "forgetting-retention",
+        "exitCode": 0,
+        "status": "ok",
+        "dataKeys": [
+          "checks",
+          "claimId",
+          "context",
+          "createdAt",
+          "durationMs",
+          "id",
+          "measurements",
+          "observation",
+          "outcome",
+          "protocolSha256",
+          "provenance",
+          "schemaVersion",
+          "sequence"
+        ]
+      },
+      {
+        "name": "status",
+        "exitCode": 0,
+        "status": "ok",
+        "dataKeys": [
+          "buildMatchesSource",
+          "claims",
+          "inventoryVersion",
+          "readinessPromotion",
+          "rebuildRequired",
+          "schemaVersion",
+          "storage"
+        ]
+      },
+      {
+        "name": "next",
+        "exitCode": 0,
+        "status": "ok",
+        "dataKeys": [
+          "buildMatchesSource",
+          "next",
+          "rebuildRequired",
+          "schemaVersion"
+        ]
+      },
+      {
+        "name": "history",
+        "exitCode": 0,
+        "status": "ok",
+        "dataKeys": null
+      }
+    ],
+    "receiptCount": 2,
+    "ledgerEntries": 2,
+    "outcomes": {
+      "recall.contract": "satisfied",
+      "forgetting.retention": "satisfied"
+    },
+    "evidenceDirectory": "local-claims-native-context",
+    "externalClaimsMarkedSatisfied": false,
+    "realMemoryDatabaseOrConfigUsed": false,
+    "failedRestrictedAttemptPreserved": "local-claims",
+    "gitHeadAtExecution": "ef50a694238081527e2a28baa31f2e43691b8c2b",
+    "gitDirtyAtExecution": true
+  },
+  "canonicalClaimStatuses": {
+    "recall.contract": "satisfied",
+    "forgetting.retention": "satisfied",
+    "host.cross-session": "unverified",
+    "host.agent-isolation": "unverified",
+    "recall.answer-quality": "unverified"
+  },
+  "nativeReplay": {
+    "stage": "native-local-replay",
+    "sourceRevision": "ef50a694238081527e2a28baa31f2e43691b8c2b",
+    "status": "completed",
+    "episodes": 8,
+    "packets": 24,
+    "sourceUnchangedPackets": 24,
+    "verifiedEmptyNamespaces": 16,
+    "approvedNativePrefixSha256": "c0b4adc6caff9c3fa8231c260efd14866e13fe4b760a78354d7195a10553e3c1",
+    "prefixBytes": 200,
+    "contextOverlayApplied": false,
+    "pinnedBinariesVerified": true
+  },
+  "answers": {
+    "count": 48,
+    "distinctSessions": 48,
+    "inventoryErrors": [],
+    "executionErrors": 0,
+    "meanWith": 0.875,
+    "meanWithout": 0.2986111111111111,
+    "meanPairedDifference": 0.5763888888888888,
+    "fullyLexicalWith": 21,
+    "fullyLexicalWithout": 6,
+    "forbiddenWith": 0,
+    "forbiddenWithout": 0,
+    "frozenGateStatus": "review-required",
+    "withSemanticComplete": 23,
+    "withoutSemanticComplete": 8,
+    "realOmissions": [
+      "q19"
+    ],
+    "misleadingAnswers": []
+  },
+  "approvedOutboundPromptManifestMatchedActual48": true,
+  "automaticReview": "Initial rejection resolved by transparent same-action reconsideration using exact public-synthetic payload proof and private gate PASS; no alternate route.",
+  "sourceProvenance": {
+    "cleanBeforeAndAfterBuild": true,
+    "broaderInventoryCount": 301,
+    "allBroaderInventoryHashesMatchAtEnd": true,
+    "uninterruptedBroaderInventoryImmutabilityClaim": false,
+    "rootReportedDocEditInterval": {
+      "path": "plugins/memory/docs/qualification.md",
+      "outsideRuntimeFingerprintInputs": true,
+      "transientAfterBuild": true,
+      "draftPreservedByRoot": true,
+      "exactOriginalRawBytesRestored": true,
+      "all48ActualPromptHashesUnchanged": true
+    },
+    "runtimeInputsUnchanged": true,
+    "currentTreeGloballyClean": false
+  },
+  "predeclarationUnchanged": true,
+  "history": "Original 202-byte-prefix negative campaign and overlay experiment remain untouched; this fresh native result is not replaced or retried.",
+  "publication": "Ignored QA artifacts await root review and durable integration; no tracked edits/Git/publication by this worker.",
+  "activation": "No actual Memory database/configuration/tunnel/key was used or changed; external host claims remain unverified.",
+  "artifactDisposition": "REJECTED CANDIDATE PROOF; not the final production runtime",
+  "productionPrefixAccepted": false,
+  "rootDecision": "Withhold the 200-byte prefix from production; restore the original 202-byte header; preserve this adverse native result. Future production artifact checks are provider-free only."
+}

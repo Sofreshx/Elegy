@@ -1,0 +1,189 @@
+{
+  "schemaVersion": "memory-realistic-validation/v1",
+  "verifiedAt": "2026-10-23T03:53:15.891244+00:00",
+  "checks": [
+    {
+      "name": "focused-regression-tests",
+      "passed": true,
+      "detail": {
+        "exitCode": 0,
+        "expectedTestCount": 14,
+        "log": "runtime/unit-tests.log"
+      }
+    },
+    {
+      "name": "python-compile",
+      "passed": true,
+      "detail": {
+        "fileCount": 10
+      }
+    },
+    {
+      "name": "deterministic-assessment-reproduction",
+      "passed": true,
+      "detail": {
+        "exitCode": 0,
+        "originalSha256": "3c641db55809b310b7b649d6e06fe3935c5b429fe7446ad4db06651abc6512ef"
+      }
+    },
+    {
+      "name": "adverse-results-gate",
+      "passed": true,
+      "detail": {
+        "expectedExitCode": 1,
+        "actualExitCode": 1,
+        "status": "blocked",
+        "criticalCases": [
+          "q09",
+          "q17",
+          "q18"
+        ]
+      }
+    },
+    {
+      "name": "source-bytes-unchanged",
+      "passed": true,
+      "detail": {
+        "fileCount": 191,
+        "differentPaths": []
+      }
+    },
+    {
+      "name": "cli-binary-binding",
+      "passed": true,
+      "detail": {
+        "sha256": "b04723bc90d79a825a310a9cb4705e120bf52a1ed5d3d999b5cb27a3370fb4e0"
+      }
+    },
+    {
+      "name": "mcp-binary-binding",
+      "passed": true,
+      "detail": {
+        "sha256": "23022345d59989b8668f341b8ad6801280d79c6047ec8e1a9077cb6a57ad9501"
+      }
+    },
+    {
+      "name": "receipt-ledger-index",
+      "passed": true,
+      "detail": {
+        "receiptId": "2bafc938-f407-4ef5-a4ae-1f34a4e35969"
+      }
+    },
+    {
+      "name": "receipt-adverse-outcome",
+      "passed": true,
+      "detail": {
+        "outcome": "inconclusive"
+      }
+    },
+    {
+      "name": "receipt-file:protocol.json",
+      "passed": true,
+      "detail": "SHA-256 verified"
+    },
+    {
+      "name": "receipt-file:corpus.json",
+      "passed": true,
+      "detail": "SHA-256 verified"
+    },
+    {
+      "name": "receipt-file:subject.json",
+      "passed": true,
+      "detail": "SHA-256 verified"
+    },
+    {
+      "name": "receipt-file:replay-03/run.json",
+      "passed": true,
+      "detail": "SHA-256 verified"
+    },
+    {
+      "name": "receipt-file:answers-01/run.json",
+      "passed": true,
+      "detail": "SHA-256 verified"
+    },
+    {
+      "name": "receipt-file:assessment.json",
+      "passed": true,
+      "detail": "SHA-256 verified"
+    },
+    {
+      "name": "receipt-file:semantic-review.json",
+      "passed": true,
+      "detail": "SHA-256 verified"
+    },
+    {
+      "name": "receipt-file:verdicts.json",
+      "passed": true,
+      "detail": "SHA-256 verified"
+    },
+    {
+      "name": "receipt-file:grade.py",
+      "passed": true,
+      "detail": "SHA-256 verified"
+    },
+    {
+      "name": "receipt-file:answer_runner.py",
+      "passed": true,
+      "detail": "SHA-256 verified"
+    },
+    {
+      "name": "receipt-file:run_replay.py",
+      "passed": true,
+      "detail": "SHA-256 verified"
+    },
+    {
+      "name": "receipt-file:harness-corrections.json",
+      "passed": true,
+      "detail": "SHA-256 verified"
+    },
+    {
+      "name": "receipt-file:legacy-diagnostic-01/run.json",
+      "passed": true,
+      "detail": "SHA-256 verified"
+    },
+    {
+      "name": "receipt-file:legacy-diagnostic-01/harbor/run.json",
+      "passed": true,
+      "detail": "SHA-256 verified"
+    },
+    {
+      "name": "receipt-file:reused-evidence.json",
+      "passed": true,
+      "detail": "SHA-256 verified"
+    },
+    {
+      "name": "cli-receipt-readback",
+      "passed": true,
+      "detail": {
+        "buildMatchesSource": true,
+        "answerQualityStatus": "reported-inconclusive"
+      }
+    },
+    {
+      "name": "local-document-links",
+      "passed": true,
+      "detail": {
+        "linkCount": 63,
+        "broken": []
+      }
+    },
+    {
+      "name": "git-diff-check",
+      "passed": true,
+      "detail": {
+        "workingTreeExitCode": 0,
+        "stagedExitCode": 0
+      }
+    }
+  ],
+  "unitTestOutput": "test_accent_abstention_and_numeric_boundaries (test_grade.GradeTests.test_accent_abstention_and_numeric_boundaries) ... ok\ntest_forbidden_negation_and_long_body (test_grade.GradeTests.test_forbidden_negation_and_long_body) ... ok\ntest_invalid_execution_is_inconclusive (test_grade.GradeTests.test_invalid_execution_is_inconclusive) ... ok\ntest_parse_authoritative_codex_fixture (test_grade.GradeTests.test_parse_authoritative_codex_fixture) ... ok\ntest_parse_rejects_tool_item (test_grade.GradeTests.test_parse_rejects_tool_item) ... ok\ntest_reconstruct_prompt_exact_accented_header (test_grade.GradeTests.test_reconstruct_prompt_exact_accented_header) ... ok\ntest_scores_list_groups_and_partial_facts (test_grade.GradeTests.test_scores_list_groups_and_partial_facts) ... ok\ntest_absent_main_is_not_evidence_of_unchanged_source (test_replay.EvidenceSafetyTests.test_absent_main_is_not_evidence_of_unchanged_source) ... ok\ntest_administrative_sidecars_do_not_fake_source_mutation (test_replay.EvidenceSafetyTests.test_administrative_sidecars_do_not_fake_source_mutation) ... ok\ntest_budget_guard_rejects_unsupported_limit_before_writes (test_replay.EvidenceSafetyTests.test_budget_guard_rejects_unsupported_limit_before_writes) ... ok\ntest_main_mutation_fails (test_replay.EvidenceSafetyTests.test_main_mutation_fails) ... ok\ntest_missing_namespace_is_rejected (test_replay.EvidenceSafetyTests.test_missing_namespace_is_rejected) ... ok\ntest_nonempty_wal_mutation_fails (test_replay.EvidenceSafetyTests.test_nonempty_wal_mutation_fails) ... ok\ntest_wrong_namespace_is_rejected (test_replay.EvidenceSafetyTests.test_wrong_namespace_is_rejected) ... ok\n\n----------------------------------------------------------------------\nRan 14 tests in 0.056s\n\nOK\n",
+  "knownNonPassingChecks": [
+    {
+      "name": "repository-docs-check",
+      "exitCode": 1,
+      "evidence": "docs-validation.json",
+      "detail": "DOCS-CHECK-015 bundle drift; DOCS-CHECK-009 freshness warning. Canonical docs/config unchanged."
+    }
+  ],
+  "status": "passed-evidence-checks"
+}

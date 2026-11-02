@@ -1,0 +1,42 @@
+version = 1
+name = "elegy-authority"
+
+[[resources]]
+kind = "filesystem"
+id = "Readiness"
+uri = "elegy://elegy/resource/readiness"
+title = "Elegy Readiness"
+description = "Generated agent-facing readiness table for every Elegy surface."
+mime_type = "text/markdown; charset=utf-8"
+root = "docs"
+path = "readiness.md"
+
+[[resources]]
+kind = "filesystem"
+id = "Architecture Index"
+uri = "elegy://elegy/resource/architecture-index"
+title = "Architecture Index"
+description = "Repo topology, governance, skill placement, and terminology index."
+mime_type = "text/markdown; charset=utf-8"
+root = "docs"
+path = "architecture/README.md"
+
+[[resources]]
+kind = "filesystem"
+id = "Docs Index"
+uri = "elegy://elegy/resource/docs-index"
+title = "Docs Index"
+description = "Full documentation index for the Elegy repository."
+mime_type = "text/markdown; charset=utf-8"
+root = "docs"
+path = "docs-index.md"
+
+[[resources]]
+kind = "filesystem"
+id = "Surface Catalog"
+uri = "elegy://elegy/resource/surfaces"
+title = "Distribution Surfaces"
+description = "Catalog of record for every distributable Elegy surface (kind, packaging, crate root)."
+mime_type = "application/json"
+root = "distribution"
+path = "surfaces.json"

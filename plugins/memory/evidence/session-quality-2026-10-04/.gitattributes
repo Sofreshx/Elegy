@@ -1,0 +1,2 @@
+# Preserve hash-bound evidence bytes, including Windows line endings.
+* -text whitespace=trailing-space,space-before-tab,cr-at-eol

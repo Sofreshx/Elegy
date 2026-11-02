@@ -1,0 +1,143 @@
+{
+  "sha256": "cc983fe2ea64222dd9fb024b18f2ce7e58bb7e4797815691e1e2af5efbbac40b",
+  "receipt": {
+    "schemaVersion": "memory-qualification/v1",
+    "id": "42535645-d7a3-4f8d-ad5b-fef429f0e8c2",
+    "sequence": 2,
+    "claimId": "forgetting.retention",
+    "protocolSha256": "95708fde4e6a5ddb2002ae3806f4466863577e21575d5453d5b4e8a501045072",
+    "createdAt": "2026-11-02T14:04:20.757137100Z",
+    "context": {
+      "sourceSha256": "b5d0c0c258c886ddeb507790553a57144ea0136a889a6649802c84a5910c3955",
+      "buildSourceSha256": "b5d0c0c258c886ddeb507790553a57144ea0136a889a6649802c84a5910c3955",
+      "executableSha256": "989c537e201cbc9cabfd69af416b002a4cf00cb777fa3da61a5455a4cf41795d",
+      "gitRevision": "5c246906c7edf7fb876901b610d1de8352307715",
+      "dirty": false,
+      "os": "windows",
+      "arch": "x86_64"
+    },
+    "provenance": "local-scenario",
+    "outcome": "satisfied",
+    "checks": [
+      {
+        "name": "importance-reliability.count-budget",
+        "passed": true,
+        "detail": "2 retained, 4 demoted, 0 deleted"
+      },
+      {
+        "name": "default-policy-identity",
+        "passed": true,
+        "detail": "Unconfigured store resolves to importance-reliability."
+      },
+      {
+        "name": "default-labelled-retention",
+        "passed": true,
+        "detail": "Default retains both labelled important facts in this fixture."
+      },
+      {
+        "name": "fifo.count-budget",
+        "passed": true,
+        "detail": "2 retained, 4 demoted, 0 deleted"
+      },
+      {
+        "name": "lru.count-budget",
+        "passed": true,
+        "detail": "2 retained, 4 demoted, 0 deleted"
+      },
+      {
+        "name": "priority-decay.count-budget",
+        "passed": true,
+        "detail": "2 retained, 4 demoted, 0 deleted"
+      },
+      {
+        "name": "random-drop.count-budget",
+        "passed": true,
+        "detail": "2 retained, 4 demoted, 0 deleted"
+      }
+    ],
+    "measurements": {
+      "activeBudget": 2,
+      "clockLimitation": "priority-decay uses the store's execution clock with fixed fixture timestamps",
+      "fixture": "forgetting-retention-v1",
+      "labelledImportantIds": [
+        "00000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-000000000002"
+      ],
+      "policies": [
+        {
+          "deleted": 0,
+          "demoted": 4,
+          "executionCompletedAt": "2026-11-02T14:04:17.210101700Z",
+          "executionStartedAt": "2026-11-02T14:04:17.208778300Z",
+          "policy": "importance-reliability",
+          "precision": 1.0,
+          "recall": 1.0,
+          "resolvedPolicy": "importance-reliability",
+          "retainedIds": [
+            "00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000002"
+          ]
+        },
+        {
+          "deleted": 0,
+          "demoted": 4,
+          "executionCompletedAt": "2026-11-02T14:04:18.158070200Z",
+          "executionStartedAt": "2026-11-02T14:04:18.156959800Z",
+          "policy": "fifo",
+          "precision": 0.0,
+          "recall": 0.0,
+          "resolvedPolicy": "fifo",
+          "retainedIds": [
+            "00000000-0000-0000-0000-000000000005",
+            "00000000-0000-0000-0000-000000000006"
+          ]
+        },
+        {
+          "deleted": 0,
+          "demoted": 4,
+          "executionCompletedAt": "2026-11-02T14:04:18.986643900Z",
+          "executionStartedAt": "2026-11-02T14:04:18.984997Z",
+          "policy": "lru",
+          "precision": 1.0,
+          "recall": 1.0,
+          "resolvedPolicy": "lru",
+          "retainedIds": [
+            "00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000002"
+          ]
+        },
+        {
+          "deleted": 0,
+          "demoted": 4,
+          "executionCompletedAt": "2026-11-02T14:04:19.612441600Z",
+          "executionStartedAt": "2026-11-02T14:04:19.611105Z",
+          "policy": "priority-decay",
+          "precision": 1.0,
+          "recall": 1.0,
+          "resolvedPolicy": "priority-decay",
+          "retainedIds": [
+            "00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000002"
+          ]
+        },
+        {
+          "deleted": 0,
+          "demoted": 4,
+          "executionCompletedAt": "2026-11-02T14:04:20.402334600Z",
+          "executionStartedAt": "2026-11-02T14:04:20.401002600Z",
+          "policy": "random-drop",
+          "precision": 0.0,
+          "recall": 0.0,
+          "resolvedPolicy": "random-drop",
+          "retainedIds": [
+            "00000000-0000-0000-0000-000000000005",
+            "00000000-0000-0000-0000-000000000006"
+          ]
+        }
+      ],
+      "scope": "fixed synthetic fixture; no universal policy winner"
+    },
+    "durationMs": 4070,
+    "observation": null
+  }
+}

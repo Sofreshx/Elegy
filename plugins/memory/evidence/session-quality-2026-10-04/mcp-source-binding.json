@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "memory-mcp-source-binding/v1",
+  "sourceCommit": "acc6b4e22625841ce0fdde55226472cd416728f1",
+  "unchangedSinceBuildByGitDiff": true,
+  "memorySourceDigest": "d1b0e0bec07aace5381a8ac3d5185b633cd17c3069e206e2aea00fe7e407f1fa",
+  "mcpExecutableSha256": "901361065cedcd54091f828a96f77768283e596ee980f18372eac86d13246eaf",
+  "cliExecutableSha256": "92692d62c558feba70a4b8df17f1575d1fbb42aa7db31be3abf855ee255af960",
+  "hostCrateFiles": [
+    {
+      "path": "hosts/memory-mcp/AGENTS.md",
+      "sha256": "2f981cfaa054477510bea2112624654edd847b8bc999fa5009f9047da4f05989"
+    },
+    {
+      "path": "hosts/memory-mcp/Cargo.toml",
+      "sha256": "f62bc3aecc4b13f31c6631cf44b4ee97eefb84837d079e16db510f0cf91d25d7"
+    },
+    {
+      "path": "hosts/memory-mcp/DISTRIBUTION.md",
+      "sha256": "0af089d86503a8595f8a7b5300cfdf38241f0d324aef1c59c4d5e0f66f358500"
+    },
+    {
+      "path": "hosts/memory-mcp/README.md",
+      "sha256": "16be734098b54893cc6b28b8d12629a28b80a2e686eac2447862ae93d280c3e2"
+    },
+    {
+      "path": "hosts/memory-mcp/docs/AUTH.md",
+      "sha256": "831330ee919f612186f52d779a15248595d76b7b54d9c9d22ad37a8d6f77cf32"
+    },
+    {
+      "path": "hosts/memory-mcp/docs/CONFIG.md",
+      "sha256": "dc052bc565aefb3c5188a7003b69dc28c7c2c7acd93d0cf19537cc125906ad76"
+    },
+    {
+      "path": "hosts/memory-mcp/docs/DEPLOYMENT.md",
+      "sha256": "5304d39770532c0d1aada297044f52aad42dbbeec5449aed23d9cf53ac39c700"
+    },
+    {
+      "path": "hosts/memory-mcp/docs/PENDING.md",
+      "sha256": "432a40d3b52e5a1af9cbf6918273bf96be068f32b48f5754f74a81179c3c6752"
+    },
+    {
+      "path": "hosts/memory-mcp/docs/TRANSPORT.md",
+      "sha256": "663e60736feaae4b6a2a822ae80dd4bac368cde2e0731c9f34b4c44c94564a02"
+    },
+    {
+      "path": "hosts/memory-mcp/docs/architecture/overview.md",
+      "sha256": "c860670718e44fafd78d24d57778ccdeba134eb7266f77e400ed6947cf2df22d"
+    },
+    {
+      "path": "hosts/memory-mcp/docs/claude-desktop-config.example.json",
+      "sha256": "1987624332870b8f6cecbd6cd0616b4f86333268a75e1850fe52b542632c11b5"
+    },
+    {
+      "path": "hosts/memory-mcp/docs/holon-mcp-config.example.json",
+      "sha256": "99a13c106d909706eb7096bf29ba3f04526b76c9a809ed900e086873d91ffae2"
+    },
+    {
+      "path": "hosts/memory-mcp/evidence/readiness-2026-07-30.json",
+      "sha256": "50d51280a1eaa435b6a451f0d2a0f8ed22d7acad7f7f638724727e1de5d6c1e8"
+    },
+    {
+      "path": "hosts/memory-mcp/readiness-http.json",
+      "sha256": "1f654d25400f961cfa3c138c145b3dc0c006c3d9d78429dd082f6f9f26efdfdc"
+    },
+    {
+      "path": "hosts/memory-mcp/readiness-stdio.json",
+      "sha256": "6d00a6579b5e9c2c7f6f8c40752ce57af89bef77fad67b047232d2f9bdbc0a4d"
+    },
+    {
+      "path": "hosts/memory-mcp/src/config.rs",
+      "sha256": "a1d8902474ed508f3721e5544a63f522ef5fc30b20c0cf4fae68a2a787e54bbb"
+    },
+    {
+      "path": "hosts/memory-mcp/src/lib.rs",
+      "sha256": "3030467c47653c29e7dd7b123b3d509f8535e85c107e3ef4243427222e5be2be"
+    },
+    {
+      "path": "hosts/memory-mcp/src/main.rs",
+      "sha256": "6f8842408623559d38990165553e19fe2204f091dc8ce7fb9bdd8e7b2855c54d"
+    },
+    {
+      "path": "hosts/memory-mcp/src/memory_tools.rs",
+      "sha256": "24f5ac27a4d663349a2984e9c8152211c3c24262a3ff39399b88bd8e6bb0a7e4"
+    },
+    {
+      "path": "hosts/memory-mcp/src/memory_tools/redaction.rs",
+      "sha256": "9825bcdf53f398770827e35c647ebfcedc59dc04fa2e074a8f2be7c371974be4"
+    },
+    {
+      "path": "hosts/memory-mcp/src/observability.rs",
+      "sha256": "2225805f42e4fb9a1679254d4f4617c2c5a25e4ac0975f9151977fa83c8c16a7"
+    },
+    {
+      "path": "hosts/memory-mcp/src/resource_auth.rs",
+      "sha256": "b399f057a93445bb9311c2489cb58f89098883c1aaa1f9391c561204cee90bdc"
+    },
+    {
+      "path": "hosts/memory-mcp/src/server.rs",
+      "sha256": "17812c9e603df9b44e66d7721e0ce62efebe0f2e2409729c38216e74218d6b98"
+    },
+    {
+      "path": "hosts/memory-mcp/src/stdio_main.rs",
+      "sha256": "20282a4d16108939c7c1ed900967d734d32eac04ce3817cc03f6dfacd66423bc"
+    },
+    {
+      "path": "hosts/memory-mcp/src/tests.rs",
+      "sha256": "076b9a4405bae83c5b5a599af6a5f0785e00ea42d3a534c0882c977b707afedb"
+    },
+    {
+      "path": "hosts/memory-mcp/tests/concurrency.rs",
+      "sha256": "1492f8e4380a78b30d5e2b2ae113cca4b7075c3cc0fa6ff9e0d54ee71dd7a447"
+    },
+    {
+      "path": "hosts/memory-mcp/tests/error_paths.rs",
+      "sha256": "9c60c6a62ba37aa2b06cf1bc7df79c423aac2a857043075d714b9ce64f48160f"
+    },
+    {
+      "path": "hosts/memory-mcp/tests/fixtures/retrieval_benchmark.v1.json",
+      "sha256": "d57219514f557c64285047135977d88e89501fac7e4856ac77a97451ef8369b4"
+    },
+    {
+      "path": "hosts/memory-mcp/tests/large_corpus_bench.rs",
+      "sha256": "7fc7b35b714dd3a86c20396b2e0538f0e74c950c5b6c46a80c81d32f3ee33e8e"
+    },
+    {
+      "path": "hosts/memory-mcp/tests/phase4_regressions.rs",
+      "sha256": "30afb68fcde1cefd54eb4979744ef737d14f7b5c93cddece00f73883724d7726"
+    },
+    {
+      "path": "hosts/memory-mcp/tests/shutdown.rs",
+      "sha256": "d1ed296d4f4715b039024e6b9d458c295cb8ce01456c755225e00e70419f9008"
+    },
+    {
+      "path": "hosts/memory-mcp/tests/stdio_bootstrap.rs",
+      "sha256": "9021a540e76b869c40ccdd5d9334f527c128b1ae3dfad993b36727db0695e053"
+    },
+    {
+      "path": "hosts/memory-mcp/tests/wu13_repro.rs",
+      "sha256": "3bc946e0caa85b694a195b1398216d55b1a1e1647c676bd2f603a90789c88a8f"
+    }
+  ],
+  "limit": "Recorder source digest excludes hosts/memory-mcp; this supplementary exact-byte inventory binds the unchanged host crate. Build command and result are in reused-evidence.json."
+}

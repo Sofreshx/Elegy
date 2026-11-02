@@ -1,0 +1,31 @@
+{
+  "sourceCommit": "REVIEWED_40_HEX_SOURCE_COMMIT",
+  "codexConfig": "C:/Example/.codex/config.toml",
+  "database": "C:/Example/.elegy/memory.db",
+  "installDirectory": "C:/Example/.codex/bin/elegy-memory/REVIEWED_40_HEX_SOURCE_COMMIT",
+  "backupDirectory": "C:/Example/.codex/private-data/elegy-memory-dot/backups/before-shared-REVIEWED_7_HEX_PREFIX",
+  "expectedCurrentMemoryEntrySha256": "REVIEWED_CURRENT_MEMORY_BINDING_SHA256",
+  "codexMemoryEntry": {
+    "command": "C:/Example/.codex/bin/elegy-memory/REVIEWED_40_HEX_SOURCE_COMMIT/elegy-memory-mcp-stdio.exe",
+    "env": {
+      "ELEGY_DB_PATH": "C:/Example/.elegy/memory.db",
+      "ELEGY_MCP_AGENT_ID": "agent-a",
+      "ELEGY_MCP_READ_SCOPE": "agent",
+      "ELEGY_MCP_SHARED_SPACE": "fictional-team",
+      "ELEGY_MCP_SHARED_AGENTS": "[\"agent-a\",\"agent-b\"]",
+      "ELEGY_EMBEDDING_BOOT_POLICY": "off"
+    }
+  },
+  "artifacts": {
+    "elegy-memory.exe": {
+      "path": "C:/Example/reviewed-build/elegy-memory.exe",
+      "sha256": "REVIEWED_MEMORY_EXECUTABLE_SHA256"
+    },
+    "elegy-memory-mcp-stdio.exe": {
+      "path": "C:/Example/reviewed-build/elegy-memory-mcp-stdio.exe",
+      "sha256": "REVIEWED_STDIO_EXECUTABLE_SHA256"
+    }
+  },
+  "tunnelProfile": "C:/Example/private/inactive-memory-profile.yaml",
+  "tunnelProfileSha256": "REVIEWED_INACTIVE_PROFILE_SHA256"
+}

@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "memory-prompt-overlay-verdict/v1",
+  "label": "PROMPT-OVERLAY EXPERIMENT",
+  "status": "CANDIDATE-PASSED",
+  "completedAt": "2026-11-02T12:10:56.091319+00:00",
+  "criteria": [
+    {
+      "criterion": "all24ValidNoTools",
+      "passed": true
+    },
+    {
+      "criterion": "q08Explicit11DayRetention",
+      "passed": true,
+      "evidence": "answers-01\\raw\\q08_with.json"
+    },
+    {
+      "criterion": "q09IdentifierUnknownNoRunbookSubstitution",
+      "passed": true,
+      "evidence": "answers-01\\raw\\q09_with.json"
+    },
+    {
+      "criterion": "q17AndQ18Correct",
+      "passed": true,
+      "evidence": [
+        "answers-01\\raw\\q17_with.json",
+        "answers-01\\raw\\q18_with.json"
+      ]
+    },
+    {
+      "criterion": "allNegativeControlsContinuePass",
+      "passed": true,
+      "detail": "Grounded semantic checks for current overrides, missing fields, hostile instruction, private marker, irrelevant data, and deletion; q24 lexical alias mismatch preserved."
+    },
+    {
+      "criterion": "noNewSemanticErrorsAmong22PreviouslyCompleteCases",
+      "passed": true
+    },
+    {
+      "criterion": "all24SemanticallyComplete",
+      "passed": true
+    },
+    {
+      "criterion": "frozenMeanMinimum",
+      "passed": true,
+      "actual": 0.9583333333333334,
+      "minimum": 0.8402777778,
+      "tolerance": 1e-06
+    },
+    {
+      "criterion": "atLeast19FullyLexicalCorrect",
+      "passed": true,
+      "actual": 23,
+      "minimum": 19
+    }
+  ],
+  "candidateSha256": "c0b4adc6caff9c3fa8231c260efd14866e13fe4b760a78354d7195a10553e3c1",
+  "candidateBytes": 200,
+  "originalPrefixBytes": 202,
+  "prefixOnlyChangeVerified": true,
+  "predeclarationSha256": "7749cb8f927c9788c27b777d0a45be7f675789fc02f52fa69d70795eb1ede756",
+  "predeclaredBeforeCalls": true,
+  "sourcePacketInventorySha256": "8f7dbd5924d584ad9d2722b71e29dcfa5ef21ab1cd99bf6253fe6a5bab48a4ed",
+  "assessmentSha256": "167874c1aba8cdecf42bb63692eba6ebb2776252e3686a2d1b3f3f93964919f5",
+  "semanticReviewSha256": "b23215e5765e7959031b6a2d7fc29d7b7a2d309b2584cc63086be7272ecde132",
+  "orchestratorSha256": "e20c1d9eec675f1d849f5654f24e5b6151e77edd0595017627c9654e1e642c34",
+  "invocationConfigurationSha256": "b9206274c525e55b519b8f84f435cbc9d2cec51d2bea53ac7d98b13be5982348",
+  "sameCodexExecutableAndInvocationAsOriginalCampaign": true,
+  "model": "gpt-5.6-luna",
+  "reasoningEffort": "medium",
+  "newWithSessions": 24,
+  "newWithoutSessions": 0,
+  "validAnswers": 24,
+  "semanticComplete": 24,
+  "frozenMeanScore": 0.9583333333333334,
+  "fullyLexicalCorrect": 23,
+  "forbiddenMentionCount": 0,
+  "retries": 0,
+  "secondCandidate": false,
+  "nativeRuntimeChanged": false,
+  "nativeBinaryRequalified": false,
+  "originalResultsChanged": false,
+  "limits": [
+    "One known-corpus prompt-overlay realization; does not establish general reliability or a stable causal effect",
+    "No fresh paired no-recall baseline; original baseline is context only",
+    "Runtime integration and fresh native verification remain root decisions",
+    "q24 is semantically correct but scores zero under unchanged frozen lexical aliases"
+  ]
+}
