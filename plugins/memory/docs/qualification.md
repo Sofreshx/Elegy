@@ -160,6 +160,30 @@ provider cost or automatic MCP call. Readiness promotion still follows the
 
 The [production integration plan](../../../docs/plans/memory-production-closure-20261102.md)
 tracks the retained source changes, executable checks and publication state.
+The [2 November evidence](../evidence/production-closure-2026-11-02/README.md)
+separates the adverse baseline, one controlled prompt-overlay experiment, and
+the native candidate that failed its predeclared all-case semantic criterion.
+That candidate was withdrawn; production retains the original 202-byte prefix.
+Positive mean scores do not override a failed predeclared criterion.
+
+The separate [production runtime record](../evidence/production-closure-2026-11-02/runtime-release/README.md)
+binds the retained runtime to its source, executables and provider-free checks.
+It does not certify model-answer reliability or an installed real host.
+Inspect its saved local claims with:
+
+```text
+cargo run --locked -p elegy-memory -- eval status --evidence-dir plugins/memory/evidence/production-closure-2026-11-02/runtime-release/local-claims --json
+cargo run --locked -p elegy-memory -- eval next --evidence-dir plugins/memory/evidence/production-closure-2026-11-02/runtime-release/local-claims --json
+```
+
+Freshness uses the executable actually running, its build/source digest, OS and
+architecture; a new build can correctly mark saved receipts stale. For a new
+experiment choose a separate evidence directory and preserve every receipt
+with its ledger, including refutations and inconclusive outcomes. Do not edit
+the frozen campaign, rerun away adverse answers or overwrite its evidence to
+obtain a passing status. The paired corpus is known and finite, with one
+realization per arm; no population-wide reliability or monetary saving is proved.
+
 The [4 October campaign](../evidence/session-quality-2026-10-04/README.md)
 and [23 October realistic campaign](../evidence/realistic-2026-10-23/README.md)
 are frozen historical observations. Their blocked second-host test and adverse

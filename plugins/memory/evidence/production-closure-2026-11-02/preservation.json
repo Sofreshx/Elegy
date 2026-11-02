@@ -602,5 +602,27 @@
     "limits": "Structural path patterns only; root-owned publication policy scan remains separate."
   },
   "promptOverlayExperimentIncludedInBaseline": false,
-  "separateControlledExperiment": "overlay-experiment; 24 new with-only, zero new without; no baseline result replaced"
+  "separateControlledExperiment": "overlay-experiment; 24 new with-only, zero new without; no baseline result replaced",
+  "separateRejectedNativeCandidate": {
+    "directory": "native-final",
+    "testedSource": "ef50a694238081527e2a28baa31f2e43691b8c2b",
+    "status": "REFUTED",
+    "withSemanticComplete": 23,
+    "required": 24,
+    "productionPrefixAccepted": false
+  },
+  "separateFinalRuntimeQualification": {
+    "directory": "runtime-release",
+    "status": "PENDING",
+    "headerBytes": 202,
+    "providerFree": true,
+    "additionalHostedModelCalls": 0
+  },
+  "generatedBytePreservationMetadata": {
+    "path": ".gitattributes",
+    "sha256": "22106984a6c1274ead5c283789ca11d75b303658949aaa627698747e7b2d6160",
+    "policy": "* -text whitespace=trailing-space,space-before-tab,cr-at-eol",
+    "rawBytesRewritten": false,
+    "meaning": "Disable Git text conversion; accept carriage returns at end of preserved lines while retaining trailing-space and space-before-tab checks."
+  }
 }

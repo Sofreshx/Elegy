@@ -1,6 +1,6 @@
 ---
 title: Shared Memory with distinct authors
-status: active
+status: completed
 owner: elegy-memory
 doc_kind: planning
 ---
@@ -8,8 +8,8 @@ doc_kind: planning
 # Shared Memory with distinct authors
 
 Goal: prepare opt-in shared agent reads on the existing database without
-rewriting authors or accessing real data. Authority: root AGENTS.md â†’
-architecture â†’ [Memory MCP spec](../specs/memory-mcp-v1/spec.md) â†’ host guidance.
+rewriting authors or accessing real data. Authority: root AGENTS.md ->
+architecture -> [Memory MCP spec](../specs/memory-mcp-v1/spec.md) -> host guidance.
 The user explicitly authorized preparing the isolated correction; cloud
 activation and credentials remain outside this implementation slice.
 
@@ -59,3 +59,15 @@ then configure each authorized host with its own actor, the common database
 and the same explicit owner allowlist. Reuse existing authors, do not
 reattribute rows. One tunnel/plugin bound to one process remains one actor.
 No runtime key or actual cloud connection was created in this slice.
+
+## Preparation slice completed
+
+The original preparation slice is complete. Its validated shared-author source
+is retained in the current integration ancestry. Current integration, final
+validation and delivery are tracked by the
+[production closure plan](memory-production-closure-20261102.md), with current
+publication state in [PR51](https://github.com/Sofreshx/Elegy/pull/51).
+
+Real-data activation and cloud credentials remain paused outside this completed
+preparation slice. No installation, real database access, runtime key or cloud
+connection is implied by source completion.

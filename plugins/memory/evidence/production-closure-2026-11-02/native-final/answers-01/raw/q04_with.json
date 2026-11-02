@@ -1,0 +1,43 @@
+{
+  "answer": "Pour la release Lumen, l’approbation relève du rôle ROLE_KITE. La vérification préalable exigée est CHECK_DELTA.",
+  "threadId": "01a19c65-f015-7c42-aae6-d6f6b4de2fc1",
+  "usage": {
+    "input_tokens": 21053,
+    "cached_input_tokens": 10496,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 58,
+    "reasoning_output_tokens": 24
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a19c65-f015-7c42-aae6-d6f6b4de2fc1\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Pour la release Lumen, l’approbation relève du rôle ROLE_KITE. La vérification préalable exigée est CHECK_DELTA.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":21053,\"cached_input_tokens\":10496,\"cache_write_input_tokens\":0,\"output_tokens\":58,\"reasoning_output_tokens\":24}}\n",
+  "stderr": "2026-11-02T13:14:48.746008Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q04",
+  "arm": "with",
+  "startedAt": "2026-11-02T13:14:48.278374+00:00",
+  "completedAt": "2026-11-02T13:14:56.612399+00:00",
+  "elapsedMs": 8335.101,
+  "promptSha256": "8f0c4edb4cea51ce969d6ff2fd898feef72deb348233936b025241ffdb7aca98",
+  "configurationSha256": "b9206274c525e55b519b8f84f435cbc9d2cec51d2bea53ac7d98b13be5982348",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

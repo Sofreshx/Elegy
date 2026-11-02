@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "memory-restricted-claim-boundary/v1",
+  "recordedAt": "2026-11-02T13:15:40.830160+00:00",
+  "classification": "Restricted-context atomic receipt hard-link denied; no complete receipt/ledger published",
+  "failedStore": "local-claims",
+  "ledgerExists": false,
+  "writerLockExists": false,
+  "pendingFilesPreserved": 1,
+  "files": [
+    {
+      "path": "local-claims\\receipts\\.a77298b7-b339-4f03-a7e4-947a772a91ee.pending",
+      "bytes": 3478,
+      "sha256": "ac35525050ce8b6524d9df1d39b7d0c765eac49c063229f34033d66320c704a9"
+    },
+    {
+      "path": "local-claim-recall-contract.log",
+      "bytes": 439,
+      "sha256": "723b3b4cabe73c7d8c9b57c727f4dcd21f55faf1ea1f7b3e262f9a3d0ea7a4a0"
+    },
+    {
+      "path": "local-claim-recall-contract-execution.json",
+      "bytes": 640,
+      "sha256": "09aea11a84796f6eba33566d9c2bdb356657ed5c0f9ef017fb5dc6a5e67d995c"
+    }
+  ],
+  "subsequentIndependentStore": "local-claims-native-context",
+  "repairOrDeletionPerformed": false
+}

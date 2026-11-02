@@ -1448,5 +1448,41 @@
   ],
   "knownGateResult": "blocked",
   "supplementalSemanticReview": "Bound to unchanged assessment; recorded agent interpretation retained, not reclassified as independent human validation.",
-  "publicationGate": "not performed; root owns publication"
+  "publicationGate": "not performed; root owns publication",
+  "laterScopedEvidence": [
+    {
+      "path": "overlay-experiment/verification.json",
+      "meaning": "Separate controlled with-only candidate experiment; no fresh paired claim."
+    },
+    {
+      "path": "native-final/verification.json",
+      "meaning": "Preservation passes; native 200-byte candidate acceptance REFUTED, 23/24 required24."
+    },
+    {
+      "path": "runtime-release/README.md",
+      "meaning": "Final provider-free 202-byte production proof PENDING; no result inferred."
+    }
+  ],
+  "gitWhitespaceMetadataFollowup": {
+    "metadataOnlyCorrection": true,
+    "gitAttributePolicy": "* -text whitespace=trailing-space,space-before-tab,cr-at-eol",
+    "copiedSourceFilesRehashed": 259,
+    "baselineRawAnswersUnchanged": 48,
+    "overlayRawAnswersUnchanged": 24,
+    "rejectedCandidateRawAnswersUnchanged": 48,
+    "allOriginalAnswerAndPayloadBytesUnchanged": true,
+    "rawNewlineRewriting": false,
+    "scopedWhitespaceChecks": [
+      {
+        "scope": "working-tree",
+        "exitCode": 0
+      },
+      {
+        "scope": "staged",
+        "exitCode": 0
+      }
+    ],
+    "nativeSubjectWhitespaceAttributeVerified": true,
+    "fullWhitespaceOutputLog": "target/qualification/production-closure/metadata-whitespace-check.log"
+  }
 }

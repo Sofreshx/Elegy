@@ -1,5 +1,5 @@
 ---
-title: Memory baseline before the field-policy fix and controlled overlay, 2 November 2026
+title: Memory baseline, controlled overlay and rejected native candidate, 2 November 2026
 status: active
 owner: Elegy Memory
 doc_kind: guide
@@ -17,7 +17,11 @@ The distinct [controlled prompt-overlay candidate experiment](overlay-experiment
 is preserved in its own subdirectory: 24 new with-only answers, zero new without
 answers, nine predeclared criteria recorded passed, and no native runtime change.
 Its candidate result is not a fresh paired A/B claim or native/source qualification.
-Any native verification belongs to a later, separately bound source phase.
+The subsequent [native 200-byte candidate](native-final/README.md) was **REFUTED**:
+23/24 semantically complete answers, required 24/24, with a new q19 omission.
+It is rejected-candidate evidence, not the production runtime. The 200-byte header
+was withdrawn; [final 202-byte runtime qualification](runtime-release/README.md)
+is pending and will be provider-free, with zero additional hosted-model calls.
 
 The tested source is `cdcb3957b2a3d4b4bfa2eb178f914254cb436dd2`, tree
 `40b9eff9085b76a76643892c84918b1ef53fbb94`, workspace package version `0.1.0`.

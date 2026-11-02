@@ -7,87 +7,127 @@ doc_kind: planning
 
 # Memory production integration and reproducible handoff
 
-Goal: finish the locally retained Memory and MCP changes, preserve their
-evidence, and deliver a reviewed, validated production candidate recoverable
-from origin. User authority: 2 November 2026 request to finish all retained
-work and make it usable and pushable to production main; prior push/merge
-authorization remains valid. No real-data activation, cloud key, persistent
-tunnel or readiness promotion is implied.
+Goal: finish and validate the retained Memory/MCP source, preserve reproducible
+evidence and deliver a production candidate through the existing origin/main
+workflow. The user authorized completion, push and merge. Real-data activation,
+cloud credentials and a persistent tunnel remain paused.
 
 Authority: root AGENTS.md -> docs/architecture/README.md -> existing recall,
-Memory MCP and readiness specs -> plugin/host AGENTS.md. Extend existing
-contracts, preserve public interfaces and untrusted-memory boundaries.
+Memory MCP and readiness specs -> plugin/host AGENTS.md. Extend the existing
+contracts and retain their instruction/data, authorization and source-state
+boundaries. Passing synthetic checks does not promote readiness.
 
-Facts: main cdaaacc already contains the Harbor/Harbor-Sandbox recall fixes
-and Tokio update. Shared-author commit 48df62f has 408 Memory and 88 MCP
-passing tests. The older realistic evaluation documents pre-fix failures and
-must remain historical. The two activation helpers are uncommitted; the
-descriptor-host branch contains six older commits needing current integration.
-Real data/configuration and keys remain private, outside the source handoff.
+## Recovered work
 
-Approach: reuse the shared-author checkout on a new codex integration branch;
-retain all original refs/worktrees. Integrate qualification artifacts intact;
-adapt the old descriptor changes to current contracts rather than overwrite
-current README, lockfile or readiness with obsolete versions. Finish the
-Windows helpers with isolated, repeatable tests and failure recovery. Measure
-current recall in synthetic databases and preserve honest quality limits.
+The integration retains all eleven original commits from the four local-only
+source/evidence branches. Shared-author reads, the descriptor/host correction
+and both historical qualification campaigns are ancestors of the integration
+branch; their original refs and worktrees remain available. Main cdaaacc
+already contained the earlier lexical recall and Tokio corrections.
 
-Success criteria:
+The finished changes include:
 
-- [ ] Every retained useful source/evidence slice is in a named durable ref,
-  with clear current versus historical verdicts and no private runtime data.
-- [x] Startup diagnostics/preflight and current project descriptors work;
-  failed configuration cannot masquerade as a healthy resource catalog.
-- [x] Shared reads preserve owner-only mutations and access filtering.
-- [x] Installation dry-run/apply/rollback/retry preserve unrelated config and
-  source data; tunnel key/process handling has reproducible synthetic checks.
-- [x] Release-mode recall latency is measured with stated corpus, sample count,
-  p50/p95/max and environment; no universal performance guarantee is claimed.
-- [ ] Relevant Rust suites, Python/PowerShell fixtures, formatting, Clippy,
-  contracts, docs and repo checks pass on the exact candidate. Reuse unchanged
-  historical tests; run new integration checks where combined code changes.
-- [ ] Independent review has no unresolved material finding. Before publication,
-  private exclusions cover tree, paths, metadata, refs and reachable history;
-  preserve hooks. Verify destination, automation and actual remote SHA.
-- [ ] Final report distinguishes code delivery, publication, observed host use,
-  real installation, cloud connectivity and missing evidence.
+- Explicit shared-agent read allowlists with original authors and owner-only
+  mutations. Legacy private reads including unowned rows now apply SQL
+  authorization before candidate limits and metadata effects. Two failures
+  involving 1,001 hidden vectors and a non-returned row were reproduced first.
+- Repository resources, a real stdio handshake in degraded configuration,
+  structured diagnostics, stderr logging and a transport-free preflight.
+- Opt-in Windows installation and tunnel helpers with verified backups,
+  interrupted-apply recovery, configuration rollback, pinned executable bytes,
+  isolated child environments and owned-process cleanup. Installation requires
+  a newly reviewed private plan and all configuration writers closed; the
+  single-writer prerequisite is not an indivisible compare-and-swap guarantee.
+- Installed-binary receipts that detect modified/missing installed bytes, plus
+  portable fixture checks in CI. The security scan uses the checksum-pinned
+  official free Gitleaks CLI; only exact reviewed historical false positives
+  are excluded.
+- A hostile multiline regression preserving JSON boundaries, the complete byte
+  budget, event/record metadata and source database bytes. The tested 200-byte
+  field-policy candidate was withdrawn after native qualification refuted it;
+  production retains the original 202-byte header.
 
-Stop conditions: private scan match; unapproved paid provider/key or external
-exposure; unexpected user edits; unresolvable authority ambiguity. Continue
-independent safe work and report the exact unresolved boundary. Do not rewrite
-published history, delete originals, fabricate a passing evaluation or promote
-readiness based on tests alone.
-
-Execution units: (1) audit/integrate retained source and evaluation artifacts;
-(2) finish helper recovery/tests/docs; (3) current synthetic recall measurement
-and focused reliability checks; (4) combined validation/review; (5) privacy,
-atomic commits, authorized publication and verified handoff.
-
-## Current evidence
+## Evidence and acceptance
 
 The [integration receipt](../../hosts/memory-mcp/evidence/production-closure-2026-11-02.json)
-binds the source files, test results and synthetic benchmark. Descriptor/host:
-18 passed and four repo resources resolved. Installer: 18 passed, with one
-restricted-environment skip for real Windows junction creation (detection was
-tested separately). Windows process fixtures: four passed. Executable receipt:
-five passed after three installed-byte integrity failures were reproduced and
-fixed. Three existing feedback/journal regressions and the valid-request
-failing-child regression passed on current source.
+records source bindings and validation. The [preserved campaign](../../plugins/memory/evidence/production-closure-2026-11-02/README.md)
+separates the adverse baseline before the field-policy correction from its
+single controlled prompt-overlay experiment and its rejected native campaign.
+None is relabelled as model qualification of the final production runtime.
 
-Release lexical library benchmark: 1,005 rows, five warmups, 100 measured
-calls and independent sessions; p50 243.18 ms, p95 306.76 ms, max 358.18 ms.
-The expected authorized record was selected every time and source database
-bytes, WAL data and access counters were unchanged. This meets the measured
-500 ms p95 target for this workload, excluding providers and model latency.
+Source tests for the tested candidate: **409 Memory and 90 Memory MCP
+passed**, zero failed; one manual release benchmark is intentionally ignored by
+the ordinary test command. All 32 contextual recall tests, all-target Clippy,
+formatting and whitespace checks pass. Descriptor/host checks: 18 passed and
+four repository resources resolved. Helper fixtures: 20 Python passed, one
+Windows junction-creation skip, seven PowerShell fixture groups and five
+installed-receipt tests passed. Junction detection has separate coverage.
+Three existing feedback/journal regressions and the valid-request failing-child
+regression also passed. Independent review has no unresolved material finding.
 
-The pre-existing 408 Memory and 88 MCP tests are reused for unchanged shared
-runtime source. The historical campaign's Harbor retrieval failures already
-have current regressions; its model omissions and adverse answer-quality
-verdict remain limits, not silently converted to successes. Readiness stays
-implemented until actual clean-install and non-fixture task evidence exists.
+The rejected candidate source is committed at 686fcb5. Its clean checkout
+ef50a694238081527e2a28baa31f2e43691b8c2b includes that source and the preserved
+baseline/overlay evidence. Before and after its release build, all 301 measured
+source hashes and the clean checkout state were unchanged. The package version
+is 0.1.0; the CLI does not expose a version flag.
 
-Remaining integration gates: combined Clippy/contracts/docs/repo checks,
-independent review, exact staged-tree privacy, commits and remote verification.
-The Windows helpers are explicitly opt-in and require a newly reviewed private
-plan/pins for an actual activation; old private commands must not be silently
-rebound to changed helper bytes.
+The rejected-candidate benchmark on that source uses 1,005 synthetic rows, five warmups,
+100 measured calls and independent sessions. Results: p50 **241.791 ms**,
+p95 **325.3459 ms**, maximum **375.2361 ms**. All 105 selections were correct;
+source database bytes, WAL and counters were unchanged. No known competing
+build/scan was active at the start. The measured p95 meets the 500 ms target
+for this Windows x64 lexical library workload. It excludes process startup,
+providers, embeddings, concurrent writers, model response time and real data;
+it is not a general latency guarantee.
+
+The native candidate produced 48 valid fresh answers with zero forbidden
+mentions. Its frozen means were 0.875 with recall and 0.2986111111 without;
+21/24 with-recall answers were fully correct under the unchanged lexical rubric.
+Those descriptive gains do not satisfy its stronger predeclared criterion:
+q19 omitted two facts explicitly present in the packet, giving 23/24 semantic
+completeness and a new error among previously correct cases. Two of ten
+acceptance checks failed. The candidate is **REFUTED**, not accepted, and was
+withdrawn without retries, another candidate or relaxed thresholds. The
+original header's known answer limitations remain visible in the baseline.
+
+The separate provider-free [production runtime record](../../plugins/memory/evidence/production-closure-2026-11-02/runtime-release/README.md)
+will bind the retained runtime, its release artifacts, contract/retention
+receipts and fresh CLI/MCP replay. It makes no new model-answer claim.
+
+Current gates:
+
+- [x] Recover source and evidence with original ancestry and historical verdicts.
+- [x] Reproduce/fix authorization, installed-byte and helper recovery failures.
+- [x] Pass focused/full source tests and independent implementation review.
+- [x] Run the frozen native paired campaign and preserve its refutation.
+- [ ] Validate the restored 202-byte runtime, then qualify committed release
+  artifacts with a fresh provider-free benchmark, replay and local claim store.
+- [ ] Validate final docs, generated projections, contracts and repository shape.
+- [ ] Pass exact staged/publication privacy gates with hooks active; verify the
+  published head and applicable CI before the authorized merge.
+
+## Handoff and limits
+
+[PR #51](https://github.com/Sofreshx/Elegy/pull/51) owns the observable integration
+and CI state. The task branch is `codex/memory-production-closure-20261102`.
+Retain the original commits through a merge commit; do not force-push or rewrite
+published history. A main merge triggers the existing main-snapshot build and
+release workflow; its result must be observed separately from source validation.
+
+Another agent should start with the [qualification guide](../../plugins/memory/docs/qualification.md),
+reload the exact inventory and evidence, and use a new disposable store for new
+experiments. Source/build/executable/OS bindings determine freshness; an old
+success is not evidence for a changed source or a second machine. Preserve
+failed and inconclusive receipts together with the append-only ledger.
+
+Readiness remains **implemented**, non-routable by default. There is no new
+clean real installation, installed cross-host task or cloud-connectivity proof.
+The real database/configuration was not opened, migrated or activated. Old
+private helper pins were not silently updated. OBS-003 and unrelated portfolio
+follow-ups are outside this integration, and this plan does not declare all
+Elegy features or roadmap work complete.
+
+Stop on a private scan match, unexpected user edit, unapproved provider cost,
+real-data/credential boundary, changed source during qualification or a failed
+predeclared criterion. Preserve the result and reassess; do not weaken tests,
+retry away an adverse answer, fabricate qualification or promote readiness.

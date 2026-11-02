@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "memory-rejected-candidate-disposition/v1",
+  "recordedAt": "2026-11-02T13:21:24.513237+00:00",
+  "sourceRevisionTested": "ef50a694238081527e2a28baa31f2e43691b8c2b",
+  "approvedPrefixCommitTested": "686fcb59055cf072140fee58418ede873d3d14c1",
+  "nativeAcceptance": "REFUTED",
+  "reason": "q19 incorrectly declares REGION_AMBER and ROLLBACK_LARCH unavailable although both facts are in the native recalled record. This is a new omission among the previously correct cases; semantic completeness is23/24 rather than24/24.",
+  "noFurtherHostedModelCalls": true,
+  "noRetryOrNewCandidate": true,
+  "rootProductionDecision": "Rollback 200-byte candidate prefix; retain unrelated integration work; future production artifact qualification provider-free.",
+  "sourceEndChecksCapturedBeforeRollback": true,
+  "all301HashesMatchedAtEnd": true,
+  "uninterrupted301ImmutabilityClaim": false,
+  "preservedEvidence": "All48native rawanswers, exact approved prompt manifest, native source packets, build/pin/source snapshots, benchmark, localclaims receipts+ledger, and failed restricted pending attempt.",
+  "gitOrPublicationByThisWorker": false
+}

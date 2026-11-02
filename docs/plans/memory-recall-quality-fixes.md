@@ -1,6 +1,6 @@
 ---
 title: Memory recall quality corrections
-status: active
+status: superseded
 owner: Elegy Memory
 doc_kind: planning
 ---
@@ -510,3 +510,16 @@ and external-subject recheck still required. No readiness is promoted. Retain
 Git source ancestry through the authorized normal push and merge after exact
 final-head CI. Remote integration and existing main-snapshot publication are
 separate observed delivery results, never inferred from the qualification.
+
+## Current tracking superseded by production closure
+
+This plan is superseded for current tracking by the
+[production closure plan](memory-production-closure-20261102.md). The source
+fixes are already on main at `cdaaacc`; the new plan owns their current
+integration, follow-up validation and publication state in
+[PR51](https://github.com/Sofreshx/Elegy/pull/51).
+
+Every historical blocked result and the frozen Q8 proof above remain unchanged.
+The unchecked all-retained-trials criterion stays unchecked: later source
+integration or a separately bound campaign does not make the failed retained
+trials pass. Real-data activation and credentials remain outside this handoff.

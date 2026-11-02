@@ -1,0 +1,120 @@
+{
+  "schemaVersion": "elegy.cli/v1",
+  "correlationId": "elegy-memory-18504-1793624990595140700",
+  "nonInteractive": true,
+  "command": [
+    "eval.run"
+  ],
+  "status": "ok",
+  "data": {
+    "checks": [
+      {
+        "detail": "Synthetic cobalt fact is recalled.",
+        "name": "positive-control",
+        "passed": true
+      },
+      {
+        "detail": "504 UTF-8 bytes",
+        "name": "context-budget",
+        "passed": true
+      },
+      {
+        "detail": "0 selected records",
+        "name": "agent-owner-isolation",
+        "passed": true
+      },
+      {
+        "detail": "0 selected records",
+        "name": "sensitivity-isolation",
+        "passed": true
+      },
+      {
+        "detail": "0 selected records",
+        "name": "tenant-owner-isolation",
+        "passed": true
+      },
+      {
+        "detail": "0 selected records",
+        "name": "user-owner-isolation",
+        "passed": true
+      },
+      {
+        "detail": "0 selected records",
+        "name": "scope-isolation",
+        "passed": true
+      },
+      {
+        "detail": "Same turn retains event identity without duplicate injection.",
+        "name": "turn-retry",
+        "passed": true
+      },
+      {
+        "detail": "Dismiss recorded once.",
+        "name": "feedback-retry",
+        "passed": true
+      },
+      {
+        "detail": "A useful judgment cannot replace the recorded dismiss.",
+        "name": "conflicting-feedback",
+        "passed": true
+      },
+      {
+        "detail": "Dismiss restores suppression after removing automatic injection suppression in the disposable fixture.",
+        "name": "injected-dismiss-suppression",
+        "passed": true
+      },
+      {
+        "detail": "A new session can recall the fact again.",
+        "name": "suppression-session-boundary",
+        "passed": true
+      },
+      {
+        "detail": "applicationId=1162302019; userVersion=1",
+        "name": "journal-header",
+        "passed": true
+      },
+      {
+        "detail": "Unsupported journal version rejected.",
+        "name": "journal-version-rejection",
+        "passed": true
+      },
+      {
+        "detail": "Foreign journal identity rejected.",
+        "name": "journal-identity-rejection",
+        "passed": true
+      },
+      {
+        "detail": "Closed source database bytes unchanged by recall and feedback.",
+        "name": "source-unchanged",
+        "passed": true
+      }
+    ],
+    "claimId": "recall.contract",
+    "context": {
+      "arch": "x86_64",
+      "buildSourceSha256": "27098f88e09566453ffec48125d60a93f3f2bc0b67c3b9a032fcf2ffe50aba9f",
+      "dirty": true,
+      "executableSha256": "a583ba9a66a41c111d8b5f00570ae2e527687e10842dc685ffc5d00d29f10bb9",
+      "gitRevision": "ef50a694238081527e2a28baa31f2e43691b8c2b",
+      "os": "windows",
+      "sourceSha256": "27098f88e09566453ffec48125d60a93f3f2bc0b67c3b9a032fcf2ffe50aba9f"
+    },
+    "createdAt": "2026-11-02T13:09:54.172993300Z",
+    "durationMs": 3057,
+    "id": "3eee16ec-8e70-442f-b2e0-c081896ef5fa",
+    "measurements": {
+      "contextBytes": 504,
+      "fixture": "recall-contract-v1",
+      "journalApplicationId": 1162302019,
+      "journalVersion": 1,
+      "scope": "synthetic library contract; does not attest a host installation or cross-client persistence",
+      "sourceBytes": 266240
+    },
+    "observation": null,
+    "outcome": "satisfied",
+    "protocolSha256": "a757c879bee388bd8cc5b6c64ed7ab97b00a9d6dfc37316a744b73c6416c919b",
+    "provenance": "local-scenario",
+    "schemaVersion": "memory-qualification/v1",
+    "sequence": 1
+  }
+}

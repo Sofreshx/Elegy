@@ -1,0 +1,9 @@
+{
+  "run_replay.py": "7c75b033edda96063a5f71e2f95d7b2c3d685e25d6dbd39fbaf3eb5518da0d26",
+  "rpc_support.py": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759",
+  "answer_runner.py": "9bd417a00518bccc0d61e75908996e0bdc80b62db9a6b96e8e278f831994ae0b",
+  "grade.py": "bf330b80fa97bc734f73e4a8c3c9257201ba12fb0ecbc52277b2e46bbb78cf54",
+  "check_results.py": "66c9822e8f23362c6d4e2b86fd5d9414530b4d44cdba6033191fb245975e273f",
+  "corpus.json": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b",
+  "protocol.json": "df253c5683deb07bac3b28f89bf80bbaef6fce21ea6a9086fed95f461e2acc4b"
+}

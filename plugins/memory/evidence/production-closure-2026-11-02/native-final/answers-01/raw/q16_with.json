@@ -1,0 +1,43 @@
+{
+  "answer": "Pour les webhooks de paiement Harbor, le cache anti-rejeu dure 90 minutes et la stratégie de déduplication s’appelle REPLAY_PINE.",
+  "threadId": "01a19c66-dee0-7ca3-8c2a-61891d192f03",
+  "usage": {
+    "input_tokens": 21056,
+    "cached_input_tokens": 16512,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 59,
+    "reasoning_output_tokens": 21
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a19c66-dee0-7ca3-8c2a-61891d192f03\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Pour les webhooks de paiement Harbor, le cache anti-rejeu dure 90 minutes et la stratégie de déduplication s’appelle REPLAY_PINE.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":21056,\"cached_input_tokens\":16512,\"cache_write_input_tokens\":0,\"output_tokens\":59,\"reasoning_output_tokens\":21}}\n",
+  "stderr": "2026-11-02T13:15:49.871388Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q16",
+  "arm": "with",
+  "startedAt": "2026-11-02T13:15:49.450630+00:00",
+  "completedAt": "2026-11-02T13:15:56.876692+00:00",
+  "elapsedMs": 7426.247,
+  "promptSha256": "11eebf8b59debbc47bf3f5522d5cbc23b81f72d7501ce553ead3fa91ad71788f",
+  "configurationSha256": "b9206274c525e55b519b8f84f435cbc9d2cec51d2bea53ac7d98b13be5982348",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}
