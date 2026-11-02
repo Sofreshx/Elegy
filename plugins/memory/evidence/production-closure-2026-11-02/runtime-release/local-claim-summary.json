@@ -1,0 +1,22 @@
+{
+  "stage": "provider-free-local-claims",
+  "sourceRevision": "5c246906c7edf7fb876901b610d1de8352307715",
+  "receiptCount": 2,
+  "ledgerEntries": 2,
+  "evidenceDirectory": "local-claims",
+  "outcomes": {
+    "forgetting.retention": "satisfied",
+    "recall.contract": "satisfied"
+  },
+  "claimStatuses": {
+    "recall.contract": "satisfied",
+    "forgetting.retention": "satisfied",
+    "host.cross-session": "unverified",
+    "host.agent-isolation": "unverified",
+    "recall.answer-quality": "unverified"
+  },
+  "buildMatchesSource": true,
+  "permittedNativeContextFromStart": true,
+  "readinessPromotion": false,
+  "providerCalls": 0
+}

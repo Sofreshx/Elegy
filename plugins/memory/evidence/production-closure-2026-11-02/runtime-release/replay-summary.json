@@ -1,0 +1,14 @@
+{
+  "stage": "provider-free-native-replay",
+  "sourceRevision": "5c246906c7edf7fb876901b610d1de8352307715",
+  "status": "completed",
+  "episodes": 8,
+  "packets": 24,
+  "sourceUnchangedPackets": 24,
+  "verifiedEmptyNamespaces": 16,
+  "nonemptyNativeContexts": 23,
+  "originalPrefixBytes": 202,
+  "originalPrefixSha256": "a288d6c38b27b6db49befcc1be34ba15b7604233100ba07506380564f8bfc5b0",
+  "contextOverlayApplied": false,
+  "modelProviderNetworkCalls": 0
+}

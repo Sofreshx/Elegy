@@ -367,8 +367,8 @@
       "freshness": "unknown",
       "path": "docs/plans/memory-production-closure-20261102.md",
       "sourceOfTruth": "planning-non-canon",
-      "status": "active",
-      "summary": "Goal: finish the locally retained Memory and MCP changes, preserve their",
+      "status": "completed",
+      "summary": "Goal: finish and validate the retained Memory/MCP source, preserve reproducible",
       "title": "Memory production integration and reproducible handoff"
     },
     {
@@ -387,7 +387,7 @@
       "freshness": "unknown",
       "path": "docs/plans/memory-recall-quality-fixes.md",
       "sourceOfTruth": "planning-non-canon",
-      "status": "active",
+      "status": "superseded",
       "summary": "Goal: correct the retrieval failure found by the 23 October controlled session",
       "title": "Memory recall quality corrections"
     },
@@ -397,7 +397,7 @@
       "freshness": "unknown",
       "path": "docs/plans/memory-shared-authors-20261024.md",
       "sourceOfTruth": "planning-non-canon",
-      "status": "active",
+      "status": "completed",
       "summary": "Goal: prepare opt-in shared agent reads on the existing database without",
       "title": "Shared Memory with distinct authors"
     },

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "memory-provider-free-runtime-protocol/v1",
+  "sourceRevision": "5c246906c7edf7fb876901b610d1de8352307715",
+  "authority": [
+    "AGENTS.md",
+    "plugins/memory/AGENTS.md",
+    "plugins/memory/docs/qualification.md",
+    "docs/specs/memory-contextual-recall-v1/spec.md"
+  ],
+  "goal": "Qualify final production runtime mechanics with original202-byte header; provider-free synthetic local checks only.",
+  "synthetic": true,
+  "memory": {
+    "transport": "actual local MCP stdio subprocess",
+    "readout": "actual contextual-recall CLI envelope, not curated",
+    "scopes": [
+      "Agent"
+    ],
+    "minSimilarity": 0.2,
+    "maxContextTokens": 600,
+    "embeddings": "off",
+    "learningEnabled": false
+  },
+  "sourceCorpusSha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b",
+  "inheritedFrozenReplayProtocolSha256": "df253c5683deb07bac3b28f89bf80bbaef6fce21ea6a9086fed95f461e2acc4b",
+  "expectedPrefixBytes": 202,
+  "expectedPrefixSha256": "b4d6645648f1a4874c27c10e4c6622ee81e7fbef0452d2c18e8a98f0588e5a43",
+  "modelCalls": 0,
+  "providerCalls": 0,
+  "networkCalls": 0,
+  "answerQualityRequalified": false,
+  "activation": "No real Memory database, configuration, installation, key or tunnel."
+}

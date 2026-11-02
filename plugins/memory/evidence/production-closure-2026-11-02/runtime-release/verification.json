@@ -1,0 +1,2994 @@
+{
+  "schemaVersion": "memory-provider-free-runtime-preservation-verification/v1",
+  "status": "PASSED-PROVIDER-FREE-RUNTIME-PRESERVATION",
+  "method": "Offline source/destination and original source-manifest hashes, source/build/protocol/prefix bindings, recorded replay/source invariants, receipt payload/ledger hashes, benchmark/provider-free checks and unchanged earlier proof.",
+  "checks": [
+    {
+      "name": "lossless:approved-head.txt",
+      "passed": true,
+      "detail": {
+        "sha256": "42c7fa0cb58f7c54b9c21725da35b736010a94c288b43b3ffe392cdd9fbbb6ec"
+      }
+    },
+    {
+      "name": "lossless:clean-head-binding.json",
+      "passed": true,
+      "detail": {
+        "sha256": "5e1b7fe0148822d953e6eea75b221633b4fe334d9d27f1d53ca9405906c9b256"
+      }
+    },
+    {
+      "name": "lossless:expected-prefix.txt",
+      "passed": true,
+      "detail": {
+        "sha256": "a288d6c38b27b6db49befcc1be34ba15b7604233100ba07506380564f8bfc5b0"
+      }
+    },
+    {
+      "name": "lossless:harness/corpus.json",
+      "passed": true,
+      "detail": {
+        "sha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b"
+      }
+    },
+    {
+      "name": "lossless:harness/protocol.json",
+      "passed": true,
+      "detail": {
+        "sha256": "7cd6dc54bef7f90729c64f54f728b881d54297d9bb56bb16794a24ee718d687e"
+      }
+    },
+    {
+      "name": "lossless:harness/protocol.original.json",
+      "passed": true,
+      "detail": {
+        "sha256": "df253c5683deb07bac3b28f89bf80bbaef6fce21ea6a9086fed95f461e2acc4b"
+      }
+    },
+    {
+      "name": "lossless:harness-copy-hashes.json",
+      "passed": true,
+      "detail": {
+        "sha256": "99e47145140052711e90791e7a634614523901bde16da3b7e5fe3ef447d08ddb"
+      }
+    },
+    {
+      "name": "lossless:local-claim-forgetting-retention.json",
+      "passed": true,
+      "detail": {
+        "sha256": "e71fe695a3066f5c02486f841b19952c7e6ddca4b3cf01aeb3203dbe76524ba4"
+      }
+    },
+    {
+      "name": "lossless:local-claim-forgetting-retention.log",
+      "passed": true,
+      "detail": {
+        "sha256": "e2fbb18e4a0edaea86914dcafedd23fe6d846d9bf00ac26225f6e00c00279aba"
+      }
+    },
+    {
+      "name": "lossless:local-claim-history.json",
+      "passed": true,
+      "detail": {
+        "sha256": "aed15b9c79ed04c2bd3ea7769863593d6659019b72610bd074c7658e01acc95f"
+      }
+    },
+    {
+      "name": "lossless:local-claim-history.log",
+      "passed": true,
+      "detail": {
+        "sha256": "cc9c58bade0b5d08008049ccfe089e745212645d74345b798ecd8929f15e35a1"
+      }
+    },
+    {
+      "name": "lossless:local-claim-recall-contract.json",
+      "passed": true,
+      "detail": {
+        "sha256": "fb089cbbee930aab73c6314350f36005ee7a9ee14fa208bb0a9417395fad55c0"
+      }
+    },
+    {
+      "name": "lossless:local-claim-recall-contract.log",
+      "passed": true,
+      "detail": {
+        "sha256": "9e3fbc5e44432fd4db1ed34ffd25373f2159d7a6e1b1960ef9bc22682ca81140"
+      }
+    },
+    {
+      "name": "lossless:local-claim-summary.json",
+      "passed": true,
+      "detail": {
+        "sha256": "e42e23b56d617dd7f1a406d6c21fd8626bd144f9ee2d87a8a0962016658a89d8"
+      }
+    },
+    {
+      "name": "lossless:local-claims/ledger.json",
+      "passed": true,
+      "detail": {
+        "sha256": "0863f365f438eedd00127cd83c767e80f71b9f056080a84b02255d3108198bf0"
+      }
+    },
+    {
+      "name": "lossless:local-claims/receipts/42535645-d7a3-4f8d-ad5b-fef429f0e8c2.json",
+      "passed": true,
+      "detail": {
+        "sha256": "bb043dc0e3968608673945822062819f083952b82c14c70d2854b17dc330176e"
+      }
+    },
+    {
+      "name": "lossless:local-claims/receipts/9186c17b-6dab-488a-8331-65427506b85a.json",
+      "passed": true,
+      "detail": {
+        "sha256": "ac1393321ea9f0458dfe461af32b7d88a4da553a3a4c6e340998fac689c13696"
+      }
+    },
+    {
+      "name": "lossless:predeclaration.json",
+      "passed": true,
+      "detail": {
+        "sha256": "e7783455f503483ee613eab896b773b8d8e62997d26979e17169dbb8a938c2bb"
+      }
+    },
+    {
+      "name": "lossless:protocol.template.json",
+      "passed": true,
+      "detail": {
+        "sha256": "714494e204b89ae3642e6a3d72f4e09daf73bf4444049e50e05070aa85536b29"
+      }
+    },
+    {
+      "name": "lossless:qualification-summary.json",
+      "passed": true,
+      "detail": {
+        "sha256": "582149949c0b19bac483dda03c5ebc4bb2061810226e806ba18acea4682d3450"
+      }
+    },
+    {
+      "name": "lossless:release-benchmark-execution.json",
+      "passed": true,
+      "detail": {
+        "sha256": "91bfb1da05bf36954161d6b0920999f66947d57eb12c7883ccff384d134d6fe2"
+      }
+    },
+    {
+      "name": "lossless:release-benchmark.json",
+      "passed": true,
+      "detail": {
+        "sha256": "48666354ceb3688b57f508da1426da2c02ec1e15cc5f26878219f6a07c52c648"
+      }
+    },
+    {
+      "name": "lossless:release-build-execution.json",
+      "passed": true,
+      "detail": {
+        "sha256": "46c8ff673eba6f2379450e253756e206fca604c95e217a67cc117e22d2cb5234"
+      }
+    },
+    {
+      "name": "lossless:release-build.json",
+      "passed": true,
+      "detail": {
+        "sha256": "9b4e815cd49345cff1bfb941e02b136fbc185cd76ba54b65c8f68e2a9c35f352"
+      }
+    },
+    {
+      "name": "lossless:release-source-before.json",
+      "passed": true,
+      "detail": {
+        "sha256": "8ecc115d9dcd5d6e27f6d35065003f04d6a5d79611f6cec812e00e4beeecf00c"
+      }
+    },
+    {
+      "name": "lossless:replay-01/ares/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "43e0502b51c81363dca35e5c54cc683662f0bdbf7c25c6e2c7dc0fb77cf9efef"
+      }
+    },
+    {
+      "name": "lossless:replay-01/cedar/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "c15eae86c60d689b103ebe58d917391baf203f6e53b09df70d08d223afaaa5e6"
+      }
+    },
+    {
+      "name": "lossless:replay-01/galen/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "9db3122789de72ce52e76604e013a8d887ee8d533aa5d6590ed20a79676d2d50"
+      }
+    },
+    {
+      "name": "lossless:replay-01/harbor/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "ffdc93aec9cb2bd0558fd0ca7b4dc676ce0abeb4edc0559c8e864959fbb6ba96"
+      }
+    },
+    {
+      "name": "lossless:replay-01/lumen/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "fe0f3f07b6bdbc75b40e8cc8afacf519fd566bfc6627c44b1c35853872a46074"
+      }
+    },
+    {
+      "name": "lossless:replay-01/quill/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "3d0b3ae53acc768c431c02ce578780045b8c14178a4d9d364f8056f2eb635c10"
+      }
+    },
+    {
+      "name": "lossless:replay-01/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "c2d976adc16d3f18abed66aa8e2a82f3227de3d197d1aafa2b1dadf439fc3505"
+      }
+    },
+    {
+      "name": "lossless:replay-01/sable/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "31caf915ebfa9a654dbb54c50425f55caddf20846ed9a87e7b3a4263b82b6330"
+      }
+    },
+    {
+      "name": "lossless:replay-01/vesper/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "3ce42881c9775d60757bc10b8281c9ecb1c5b0c4fc70bd0c7ad548d8d89d28c2"
+      }
+    },
+    {
+      "name": "lossless:replay-01.log",
+      "passed": true,
+      "detail": {
+        "sha256": "a1858b8c3923baffa04271cac91177170a6176c822877e923334cc4d6afc507f"
+      }
+    },
+    {
+      "name": "lossless:replay-summary.json",
+      "passed": true,
+      "detail": {
+        "sha256": "d3e20b163c672c26b30fee42882472e1f315b42578413c877eaf0084b0b3de7b"
+      }
+    },
+    {
+      "name": "lossless:source-sha256-manifest.json",
+      "passed": true,
+      "detail": {
+        "sha256": "260abd001a693c940d5b8b0f9f20514aebe3751619ee3f8e8017ff1fa34a7a62"
+      }
+    },
+    {
+      "name": "source-manifest:approved-head.txt",
+      "passed": true,
+      "detail": {
+        "sha256": "42c7fa0cb58f7c54b9c21725da35b736010a94c288b43b3ffe392cdd9fbbb6ec"
+      }
+    },
+    {
+      "name": "source-manifest:clean-head-binding.json",
+      "passed": true,
+      "detail": {
+        "sha256": "5e1b7fe0148822d953e6eea75b221633b4fe334d9d27f1d53ca9405906c9b256"
+      }
+    },
+    {
+      "name": "source-manifest:expected-prefix.txt",
+      "passed": true,
+      "detail": {
+        "sha256": "a288d6c38b27b6db49befcc1be34ba15b7604233100ba07506380564f8bfc5b0"
+      }
+    },
+    {
+      "name": "source-manifest:harness/corpus.json",
+      "passed": true,
+      "detail": {
+        "sha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b"
+      }
+    },
+    {
+      "name": "source-manifest:harness/protocol.json",
+      "passed": true,
+      "detail": {
+        "sha256": "7cd6dc54bef7f90729c64f54f728b881d54297d9bb56bb16794a24ee718d687e"
+      }
+    },
+    {
+      "name": "source-manifest:harness/protocol.original.json",
+      "passed": true,
+      "detail": {
+        "sha256": "df253c5683deb07bac3b28f89bf80bbaef6fce21ea6a9086fed95f461e2acc4b"
+      }
+    },
+    {
+      "name": "source-manifest:harness/rpc_support.py",
+      "passed": true,
+      "detail": {
+        "sha256": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759"
+      }
+    },
+    {
+      "name": "source-manifest:harness/run_replay.py",
+      "passed": true,
+      "detail": {
+        "sha256": "7c75b033edda96063a5f71e2f95d7b2c3d685e25d6dbd39fbaf3eb5518da0d26"
+      }
+    },
+    {
+      "name": "source-manifest:harness-copy-hashes.json",
+      "passed": true,
+      "detail": {
+        "sha256": "99e47145140052711e90791e7a634614523901bde16da3b7e5fe3ef447d08ddb"
+      }
+    },
+    {
+      "name": "source-manifest:local-claim-forgetting-retention-execution.json",
+      "passed": true,
+      "detail": {
+        "sha256": "93361759156fab880cee08c17b78ba7949375871435292bff853e9cdf023ce3a"
+      }
+    },
+    {
+      "name": "source-manifest:local-claim-forgetting-retention.json",
+      "passed": true,
+      "detail": {
+        "sha256": "e71fe695a3066f5c02486f841b19952c7e6ddca4b3cf01aeb3203dbe76524ba4"
+      }
+    },
+    {
+      "name": "source-manifest:local-claim-forgetting-retention.log",
+      "passed": true,
+      "detail": {
+        "sha256": "e2fbb18e4a0edaea86914dcafedd23fe6d846d9bf00ac26225f6e00c00279aba"
+      }
+    },
+    {
+      "name": "source-manifest:local-claim-history-execution.json",
+      "passed": true,
+      "detail": {
+        "sha256": "a325135fab61879a34b5b16b4fe3fbef80177d39c9f2e6c525be2eff6d0809d1"
+      }
+    },
+    {
+      "name": "source-manifest:local-claim-history.json",
+      "passed": true,
+      "detail": {
+        "sha256": "aed15b9c79ed04c2bd3ea7769863593d6659019b72610bd074c7658e01acc95f"
+      }
+    },
+    {
+      "name": "source-manifest:local-claim-history.log",
+      "passed": true,
+      "detail": {
+        "sha256": "cc9c58bade0b5d08008049ccfe089e745212645d74345b798ecd8929f15e35a1"
+      }
+    },
+    {
+      "name": "source-manifest:local-claim-next-execution.json",
+      "passed": true,
+      "detail": {
+        "sha256": "ea98f7949c2534b84c852d8d2a9f1b796a28d9eba217e125003a5913f33ba569"
+      }
+    },
+    {
+      "name": "source-manifest:local-claim-next.json",
+      "passed": true,
+      "detail": {
+        "sha256": "2d734699ab0e9db9cdb649a06aa6cedb9d1cf5b9304e84cbd48358fbd5061877"
+      }
+    },
+    {
+      "name": "source-manifest:local-claim-next.log",
+      "passed": true,
+      "detail": {
+        "sha256": "79ad4e0583547047047a97c1968cb48e0cf5e93288b4ec56a894ab496d45219e"
+      }
+    },
+    {
+      "name": "source-manifest:local-claim-recall-contract-execution.json",
+      "passed": true,
+      "detail": {
+        "sha256": "f4c47eec884a11ee173139d81b3d4a44c472117c0a47cb73afacd216c4bc3e95"
+      }
+    },
+    {
+      "name": "source-manifest:local-claim-recall-contract.json",
+      "passed": true,
+      "detail": {
+        "sha256": "fb089cbbee930aab73c6314350f36005ee7a9ee14fa208bb0a9417395fad55c0"
+      }
+    },
+    {
+      "name": "source-manifest:local-claim-recall-contract.log",
+      "passed": true,
+      "detail": {
+        "sha256": "9e3fbc5e44432fd4db1ed34ffd25373f2159d7a6e1b1960ef9bc22682ca81140"
+      }
+    },
+    {
+      "name": "source-manifest:local-claim-status-execution.json",
+      "passed": true,
+      "detail": {
+        "sha256": "820dc4bdaf6d2d6175db0864b0e89cbb79d07aa29de8ebb8e9fbd9ae9e6a2b17"
+      }
+    },
+    {
+      "name": "source-manifest:local-claim-status.json",
+      "passed": true,
+      "detail": {
+        "sha256": "c1b5991a5cfcf0a5b5e1ea47e0df9a69e3271827aa1163f42c38143bd672a2f0"
+      }
+    },
+    {
+      "name": "source-manifest:local-claim-status.log",
+      "passed": true,
+      "detail": {
+        "sha256": "37773a3771be3eee16a84161f99f9462b95f1661cf20930f39167e5d74ce0561"
+      }
+    },
+    {
+      "name": "source-manifest:local-claim-summary.json",
+      "passed": true,
+      "detail": {
+        "sha256": "e42e23b56d617dd7f1a406d6c21fd8626bd144f9ee2d87a8a0962016658a89d8"
+      }
+    },
+    {
+      "name": "source-manifest:local-claims/ledger.json",
+      "passed": true,
+      "detail": {
+        "sha256": "0863f365f438eedd00127cd83c767e80f71b9f056080a84b02255d3108198bf0"
+      }
+    },
+    {
+      "name": "source-manifest:local-claims/receipts/42535645-d7a3-4f8d-ad5b-fef429f0e8c2.json",
+      "passed": true,
+      "detail": {
+        "sha256": "bb043dc0e3968608673945822062819f083952b82c14c70d2854b17dc330176e"
+      }
+    },
+    {
+      "name": "source-manifest:local-claims/receipts/9186c17b-6dab-488a-8331-65427506b85a.json",
+      "passed": true,
+      "detail": {
+        "sha256": "ac1393321ea9f0458dfe461af32b7d88a4da553a3a4c6e340998fac689c13696"
+      }
+    },
+    {
+      "name": "source-manifest:predeclaration.json",
+      "passed": true,
+      "detail": {
+        "sha256": "e7783455f503483ee613eab896b773b8d8e62997d26979e17169dbb8a938c2bb"
+      }
+    },
+    {
+      "name": "source-manifest:protocol.template.json",
+      "passed": true,
+      "detail": {
+        "sha256": "714494e204b89ae3642e6a3d72f4e09daf73bf4444049e50e05070aa85536b29"
+      }
+    },
+    {
+      "name": "source-manifest:qualification-summary.json",
+      "passed": true,
+      "detail": {
+        "sha256": "582149949c0b19bac483dda03c5ebc4bb2061810226e806ba18acea4682d3450"
+      }
+    },
+    {
+      "name": "source-manifest:qualify_runtime.py",
+      "passed": true,
+      "detail": {
+        "sha256": "0fe614d9ae5c6bb5ea014040262aa248769298a8b6e6b95348ef091fe0d31f7d"
+      }
+    },
+    {
+      "name": "source-manifest:release-benchmark-execution.json",
+      "passed": true,
+      "detail": {
+        "sha256": "91bfb1da05bf36954161d6b0920999f66947d57eb12c7883ccff384d134d6fe2"
+      }
+    },
+    {
+      "name": "source-manifest:release-benchmark.json",
+      "passed": true,
+      "detail": {
+        "sha256": "48666354ceb3688b57f508da1426da2c02ec1e15cc5f26878219f6a07c52c648"
+      }
+    },
+    {
+      "name": "source-manifest:release-benchmark.log",
+      "passed": true,
+      "detail": {
+        "sha256": "f87217a2d841d57d3d19c97643b3e3a93000cdbeab474ef7a717017660df4739"
+      }
+    },
+    {
+      "name": "source-manifest:release-build-execution.json",
+      "passed": true,
+      "detail": {
+        "sha256": "46c8ff673eba6f2379450e253756e206fca604c95e217a67cc117e22d2cb5234"
+      }
+    },
+    {
+      "name": "source-manifest:release-build.json",
+      "passed": true,
+      "detail": {
+        "sha256": "9b4e815cd49345cff1bfb941e02b136fbc185cd76ba54b65c8f68e2a9c35f352"
+      }
+    },
+    {
+      "name": "source-manifest:release-build.log",
+      "passed": true,
+      "detail": {
+        "sha256": "e27b35d36197c8182f0c1b367a7807104b6a1786e64266c74de2eee85a1e93eb"
+      }
+    },
+    {
+      "name": "source-manifest:release-source-before.json",
+      "passed": true,
+      "detail": {
+        "sha256": "8ecc115d9dcd5d6e27f6d35065003f04d6a5d79611f6cec812e00e4beeecf00c"
+      }
+    },
+    {
+      "name": "source-manifest:replay-01/ares/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "43e0502b51c81363dca35e5c54cc683662f0bdbf7c25c6e2c7dc0fb77cf9efef"
+      }
+    },
+    {
+      "name": "source-manifest:replay-01/cedar/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "c15eae86c60d689b103ebe58d917391baf203f6e53b09df70d08d223afaaa5e6"
+      }
+    },
+    {
+      "name": "source-manifest:replay-01/galen/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "9db3122789de72ce52e76604e013a8d887ee8d533aa5d6590ed20a79676d2d50"
+      }
+    },
+    {
+      "name": "source-manifest:replay-01/harbor/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "ffdc93aec9cb2bd0558fd0ca7b4dc676ce0abeb4edc0559c8e864959fbb6ba96"
+      }
+    },
+    {
+      "name": "source-manifest:replay-01/lumen/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "fe0f3f07b6bdbc75b40e8cc8afacf519fd566bfc6627c44b1c35853872a46074"
+      }
+    },
+    {
+      "name": "source-manifest:replay-01/quill/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "3d0b3ae53acc768c431c02ce578780045b8c14178a4d9d364f8056f2eb635c10"
+      }
+    },
+    {
+      "name": "source-manifest:replay-01/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "c2d976adc16d3f18abed66aa8e2a82f3227de3d197d1aafa2b1dadf439fc3505"
+      }
+    },
+    {
+      "name": "source-manifest:replay-01/sable/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "31caf915ebfa9a654dbb54c50425f55caddf20846ed9a87e7b3a4263b82b6330"
+      }
+    },
+    {
+      "name": "source-manifest:replay-01/vesper/run.json",
+      "passed": true,
+      "detail": {
+        "sha256": "3ce42881c9775d60757bc10b8281c9ecb1c5b0c4fc70bd0c7ad548d8d89d28c2"
+      }
+    },
+    {
+      "name": "source-manifest:replay-01-execution.json",
+      "passed": true,
+      "detail": {
+        "sha256": "cd54fdc373b81f688564e65748b5e4b36d6ca2515c7efbfe99dfa0f83015c215"
+      }
+    },
+    {
+      "name": "source-manifest:replay-01.log",
+      "passed": true,
+      "detail": {
+        "sha256": "a1858b8c3923baffa04271cac91177170a6176c822877e923334cc4d6afc507f"
+      }
+    },
+    {
+      "name": "source-manifest:replay-summary.json",
+      "passed": true,
+      "detail": {
+        "sha256": "d3e20b163c672c26b30fee42882472e1f315b42578413c877eaf0084b0b3de7b"
+      }
+    },
+    {
+      "name": "clean-source-binding",
+      "passed": true,
+      "detail": {
+        "sourceRevision": "5c246906c7edf7fb876901b610d1de8352307715",
+        "cleanAtRecordedEndpoints": true
+      }
+    },
+    {
+      "name": "source-inventory",
+      "passed": true,
+      "detail": {
+        "sourceFiles": 301,
+        "recordedEndChecksPass": true
+      }
+    },
+    {
+      "name": "package-and-binaries",
+      "passed": true,
+      "detail": {
+        "packageVersion": "0.1.0",
+        "cliSha256": "989c537e201cbc9cabfd69af416b002a4cf00cb777fa3da61a5455a4cf41795d",
+        "mcpSha256": "ac0e39fcabcbd6faba96b9611ae6d6168eca748a995fe3623bc2654221e912ef"
+      }
+    },
+    {
+      "name": "protocol-and-harness",
+      "passed": true,
+      "detail": {
+        "protocolSha256": "7cd6dc54bef7f90729c64f54f728b881d54297d9bb56bb16794a24ee718d687e",
+        "corpusSha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b"
+      }
+    },
+    {
+      "name": "logical-prefix-and-CRLF-file-bindings",
+      "passed": true,
+      "detail": {
+        "logicalPrefixBytes": 202,
+        "logicalPrefixSha256": "b4d6645648f1a4874c27c10e4c6622ee81e7fbef0452d2c18e8a98f0588e5a43",
+        "rawExpectedPrefixFileBytes": 203,
+        "rawExpectedPrefixFileSha256": "a288d6c38b27b6db49befcc1be34ba15b7604233100ba07506380564f8bfc5b0"
+      }
+    },
+    {
+      "name": "episode:cedar",
+      "passed": true,
+      "detail": {
+        "stages": 3
+      }
+    },
+    {
+      "name": "native-packet:q01",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q02",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q03",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "cleanup:cedar:qual-a",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "cleanup:cedar:qual-b",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "episode:lumen",
+      "passed": true,
+      "detail": {
+        "stages": 3
+      }
+    },
+    {
+      "name": "native-packet:q04",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q05",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q06",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "cleanup:lumen:qual-a",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "cleanup:lumen:qual-b",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "episode:ares",
+      "passed": true,
+      "detail": {
+        "stages": 3
+      }
+    },
+    {
+      "name": "native-packet:q07",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q08",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q09",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "cleanup:ares:qual-a",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "cleanup:ares:qual-b",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "episode:sable",
+      "passed": true,
+      "detail": {
+        "stages": 3
+      }
+    },
+    {
+      "name": "native-packet:q10",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q11",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q12",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "cleanup:sable:qual-a",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "cleanup:sable:qual-b",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "episode:galen",
+      "passed": true,
+      "detail": {
+        "stages": 3
+      }
+    },
+    {
+      "name": "native-packet:q13",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q14",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q15",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "cleanup:galen:qual-a",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "cleanup:galen:qual-b",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "episode:harbor",
+      "passed": true,
+      "detail": {
+        "stages": 3
+      }
+    },
+    {
+      "name": "native-packet:q16",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q17",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q18",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "cleanup:harbor:qual-a",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "cleanup:harbor:qual-b",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "episode:vesper",
+      "passed": true,
+      "detail": {
+        "stages": 3
+      }
+    },
+    {
+      "name": "native-packet:q19",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q20",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q21",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "cleanup:vesper:qual-a",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "cleanup:vesper:qual-b",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "episode:quill",
+      "passed": true,
+      "detail": {
+        "stages": 3
+      }
+    },
+    {
+      "name": "native-packet:q22",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q23",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "native-packet:q24",
+      "passed": true,
+      "detail": {
+        "sourceUnchanged": true,
+        "nativePrefixMatches": true,
+        "overlayApplied": false
+      }
+    },
+    {
+      "name": "cleanup:quill:qual-a",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "cleanup:quill:qual-b",
+      "passed": true,
+      "detail": {
+        "verifiedEmpty": true
+      }
+    },
+    {
+      "name": "replay-inventory",
+      "passed": true,
+      "detail": {
+        "episodes": 8,
+        "packets": 24,
+        "native202NonemptyContexts": 23,
+        "emptyCleanupNamespaces": 16
+      }
+    },
+    {
+      "name": "receipt-ledger:9186c17b-6dab-488a-8331-65427506b85a",
+      "passed": true,
+      "detail": {
+        "receiptSha256": "2a1c9cc903969e136f003292b6e058dd2326c277835a2b6d93bf41e45097db8d",
+        "wrapperFileSha256": "ac1393321ea9f0458dfe461af32b7d88a4da553a3a4c6e340998fac689c13696",
+        "claimId": "recall.contract"
+      }
+    },
+    {
+      "name": "receipt-ledger:42535645-d7a3-4f8d-ad5b-fef429f0e8c2",
+      "passed": true,
+      "detail": {
+        "receiptSha256": "cc983fe2ea64222dd9fb024b18f2ce7e58bb7e4797815691e1e2af5efbbac40b",
+        "wrapperFileSha256": "bb043dc0e3968608673945822062819f083952b82c14c70d2854b17dc330176e",
+        "claimId": "forgetting.retention"
+      }
+    },
+    {
+      "name": "claim-statuses",
+      "passed": true,
+      "detail": {
+        "localSatisfied": 2,
+        "externalUnverified": 3,
+        "readinessPromotion": false
+      }
+    },
+    {
+      "name": "benchmark",
+      "passed": true,
+      "detail": {
+        "warmups": 5,
+        "measuredCalls": 100,
+        "correctCalls": 105,
+        "latencyMs": {
+          "max": 412.3922,
+          "p50": 255.40610000000004,
+          "p95": 345.9311
+        }
+      }
+    },
+    {
+      "name": "provider-free-result",
+      "passed": true,
+      "detail": {
+        "status": "PASSED-PROVIDER-FREE-RUNTIME-CHECKS",
+        "modelCalls": 0,
+        "providerCalls": 0,
+        "networkCalls": 0,
+        "cargoOffline": true,
+        "answerQualityRequalified": false
+      }
+    },
+    {
+      "name": "reused-script:harness/rpc_support.py",
+      "passed": true,
+      "detail": {
+        "sha256": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759"
+      }
+    },
+    {
+      "name": "reused-script:harness/run_replay.py",
+      "passed": true,
+      "detail": {
+        "sha256": "7c75b033edda96063a5f71e2f95d7b2c3d685e25d6dbd39fbaf3eb5518da0d26"
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q01_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q01_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q02_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q02_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q03_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q03_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q04_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q04_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q05_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q05_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q06_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q06_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q07_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q07_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q08_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q08_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q09_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q09_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q10_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q10_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q11_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q11_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q12_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q12_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q13_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q13_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q14_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q14_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q15_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q15_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q16_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q16_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q17_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q17_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q18_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q18_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q19_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q19_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q20_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q20_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q21_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q21_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q22_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q22_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q23_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q23_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q24_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/raw/q24_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:answers-01.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:assessment.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:binary-version.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:gate.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:grade.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:harness/corpus.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:harness/protocol.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:harness-copy-hashes.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:preflight-01/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:preflight-01.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:preflight-02/raw/preflight_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:preflight-02/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:preflight-02.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:release-artifact-pin.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:release-artifact-pin.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:release-benchmark.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:release-source-before.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:replay-01/ares/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:replay-01/cedar/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:replay-01/galen/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:replay-01/harbor/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:replay-01/lumen/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:replay-01/quill/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:replay-01/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:replay-01/sable/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:replay-01/vesper/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:replay-01.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:replay-summary.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:semantic-review.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:.:verdicts.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q01_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q02_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q03_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q04_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q05_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q06_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q07_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q08_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q09_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q10_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q11_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q12_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q13_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q14_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q15_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q16_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q17_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q18_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q19_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q20_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q21_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q22_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q23_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/raw/q24_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:answers-01.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:assessment.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:candidate.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:original.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:predeclaration.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:run_experiment.py",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:semantic-review.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:source-and-overlay-packets.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:overlay-experiment:verdict.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q01_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q01_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q02_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q02_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q03_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q03_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q04_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q04_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q05_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q05_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q06_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q06_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q07_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q07_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q08_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q08_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q09_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q09_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q10_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q10_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q11_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q11_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q12_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q12_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q13_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q13_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q14_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q14_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q15_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q15_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q16_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q16_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q17_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q17_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q18_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q18_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q19_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q19_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q20_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q20_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q21_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q21_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q22_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q22_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q23_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q23_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q24_with.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/raw/q24_without.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:answers-01/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:approval-boundary.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:approved-head.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:assessment.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:clean-head-binding.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:failed-restricted-attempt/pending-receipt.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:gate.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:grade.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:harness-copy-hashes.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:harness/corpus.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:harness/protocol.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:local-claim-recall-contract.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:local-claim-summary.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:local-claims-native-context/ledger.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:local-claims-native-context/receipts/3eee16ec-8e70-442f-b2e0-c081896ef5fa.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:local-claims-native-context/receipts/9dc805d8-c719-45d7-9001-8ee49dd80725.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:native-context-local-claim-forgetting-retention.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:native-context-local-claim-forgetting-retention.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:native-context-local-claim-history.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:native-context-local-claim-history.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:native-context-local-claim-recall-contract.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:native-context-local-claim-recall-contract.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:native-verdict.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload-proof.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q01_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q01_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q02_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q02_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q03_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q03_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q04_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q04_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q05_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q05_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q06_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q06_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q07_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q07_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q08_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q08_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q09_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q09_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q10_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q10_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q11_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q11_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q12_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q12_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q13_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q13_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q14_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q14_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q15_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q15_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q16_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q16_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q17_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q17_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q18_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q18_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q19_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q19_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q20_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q20_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q21_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q21_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q22_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q22_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q23_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q23_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q24_with.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:outbound-payload/q24_without.txt",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:predeclaration.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:qualification-summary.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:rejected-candidate.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:release-benchmark-execution.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:release-benchmark.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:release-build-execution.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:release-build.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:release-source-before.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:replay-01.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:replay-01/ares/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:replay-01/cedar/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:replay-01/galen/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:replay-01/harbor/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:replay-01/lumen/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:replay-01/quill/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:replay-01/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:replay-01/sable/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:replay-01/vesper/run.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:replay-summary.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:restricted-claim-boundary.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:semantic-review.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:source-sha256-manifest.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:subject-prepare.log",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:subject.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "earlier-proof:native-final:verdicts.json",
+      "passed": true,
+      "detail": {
+        "unchanged": true
+      }
+    },
+    {
+      "name": "rejected-native-remains-refuted",
+      "passed": true,
+      "detail": {
+        "status": "REFUTED",
+        "semanticComplete": 23,
+        "required": 24
+      }
+    }
+  ],
+  "losslessSourceFiles": 37,
+  "sourceManifestEntriesVerified": 51,
+  "earlierSourceFilesUnchanged": 259,
+  "modelCallsDuringQualificationAndPreservation": 0,
+  "answerQualityRequalified": false,
+  "prefixHashClarification": "Protocol and predeclaration hash the202-byte logical native prefix; replay-summary.originalPrefixSha256 hashes the203-byte CRLF expected-prefix.txt file. Both bindings verified without changing originals.",
+  "preparationNotes": [
+    "An initial verification conflated logical-prefix and CRLF-file digests; corrected to verify both originals separately.",
+    "The first explicit verification of an intentional historical-script parent-relative reference used an overly strict evidence-local path resolver; it now resolves only the fixed historical script directory. No artifact, source, replay or model result changed."
+  ],
+  "priorValidation": "499 passed, one ignored, fmt and Clippy pass are root-reported and hash-bound by clean-head-binding.json; not rerun by this preservation worker.",
+  "privacyPathCheck": "Structural path scan is separate from root-owned publication exclusions.",
+  "publicationGatePerformed": false,
+  "producerPrefixHashMetadataClarification": {
+    "classification": "producer-metadata-erratum-only",
+    "producerFields": [
+      "replay-summary.json:/originalPrefixSha256",
+      "qualification-summary.json:/nativeReplay/originalPrefixSha256"
+    ],
+    "producerValueHashes": "unchanged 203-byte CRLF expected-prefix.txt file",
+    "rawFileBytes": 203,
+    "rawFileSha256": "a288d6c38b27b6db49befcc1be34ba15b7604233100ba07506380564f8bfc5b0",
+    "logicalNativePrefixBytes": 202,
+    "logicalNativePrefixSha256": "b4d6645648f1a4874c27c10e4c6622ee81e7fbef0452d2c18e8a98f0588e5a43",
+    "verificationTransform": "UTF-8 decode with CRLF-to-LF normalization, for comparison only; all copied source bytes remain unchanged",
+    "nativeBehaviorError": false
+  },
+  "portableModuleChecks": {
+    "structuralMachinePathMatches": 0,
+    "localReadmeLinksChecked": 74,
+    "brokenLinks": 0,
+    "runtimeByteAndCRLFAttributesVerified": true,
+    "scopedWhitespaceChecks": [
+      {
+        "scope": "working-tree",
+        "exitCode": 0
+      },
+      {
+        "scope": "staged",
+        "exitCode": 0
+      }
+    ],
+    "fullWhitespaceLog": "target/qualification/production-closure/runtime-preservation-whitespace-check.log",
+    "privatePublicationExclusionScanPerformed": false
+  }
+}

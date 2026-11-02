@@ -21,7 +21,10 @@ The subsequent [native 200-byte candidate](native-final/README.md) was **REFUTED
 23/24 semantically complete answers, required 24/24, with a new q19 omission.
 It is rejected-candidate evidence, not the production runtime. The 200-byte header
 was withdrawn; [final 202-byte runtime qualification](runtime-release/README.md)
-is pending and will be provider-free, with zero additional hosted-model calls.
+passed its provider-free runtime checks with zero additional hosted-model calls.
+The final source is `5c246906c7edf7fb876901b610d1de8352307715`; two local claims
+are satisfied, while all three external host/answer-quality claims remain unverified.
+The rejected native candidate and all earlier adverse answers remain unchanged.
 
 The tested source is `cdcb3957b2a3d4b4bfa2eb178f914254cb436dd2`, tree
 `40b9eff9085b76a76643892c84918b1ef53fbb94`, workspace package version `0.1.0`.

@@ -58,7 +58,12 @@
       "sourceSnapshotUnreviewedFindings": 0,
       "reviewedExactFingerprintsOnly": true,
       "validatedCheckpointCommit": "cdcb3957b2a3d4b4bfa2eb178f914254cb436dd2",
-      "currentCandidateRescan": "pending final staged tree"
+      "finalRuntimeHistory": {
+        "sourceHead": "5c246906c7edf7fb876901b610d1de8352307715",
+        "exitCode": 0,
+        "findings": 0,
+        "scope": "All reachable local history, existing exact reviewed fingerprints retained."
+      }
     },
     "independentReview": {
       "reviewedCommit": "686fcb59055cf072140fee58418ede873d3d14c1",
@@ -96,6 +101,49 @@
       "redExpectedFailures": 1,
       "jsonEventRecordBudgetAndSourceBoundariesPreserved": true,
       "validationSummarySha256": "1e39b9a080e187651f47eb45aa8a560ba8b3f485b77d3c1f2b72e1d835b743b9"
+    },
+    "rustSuites": {
+      "command": "cargo test --locked -p elegy-memory -p elegy-memory-mcp",
+      "executionContext": "native require_escalated with writable process-local TEMP/TMP",
+      "exitCode": 0,
+      "memoryPassed": 409,
+      "memoryMcpPassed": 90,
+      "passed": 499,
+      "failed": 0,
+      "ignored": 1,
+      "ignoredReason": "manual release-only recall performance benchmark",
+      "logSha256": "5f20754e2d37a42c29cd6746f8ce035b46504325321d68f1912095d86b2147fe"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p elegy-memory -p elegy-memory-mcp --all-targets -- -D warnings",
+      "exitCode": 0,
+      "durationSeconds": 61,
+      "note": "Only Windows incremental-cache hard-link copy warnings; no Clippy errors.",
+      "logSha256": "cc6fec90d3db5967ab69e318ff3d31b7796acff0575be0b84dfcc1566234313e"
+    },
+    "docsAndRepo": {
+      "validatedSourceHead": "5c246906c7edf7fb876901b610d1de8352307715",
+      "contractsExitCode": 0,
+      "documentationInspectExitCode": 0,
+      "documentationMapExitCode": 0,
+      "readinessExportExitCode": 0,
+      "bundleExportExitCode": 0,
+      "documentationCheckExitCode": 0,
+      "repoShapeIssues": 0,
+      "brokenSourceLinks": 0,
+      "readinessOutputUnchanged": true,
+      "generatedBundleChange": "Completed/superseded plan statuses, four lines added and four removed.",
+      "warnings": [
+        "Missing compatibility manifest (warning only).",
+        "Existing observation-substrate roadmap freshness warning."
+      ],
+      "unmodifiedPublicInstallPlan": {
+        "path": "hosts/memory-mcp/docs/shared-install-plan.example.json",
+        "sha256": "0a3438f03421644be62cb5716f976e1b08170f2dcdabf6e02f3d1ba8207db840",
+        "expectedExitCode": 1,
+        "reason": "Exact committed source required",
+        "beforeConfigOrDatabaseAccess": true
+      }
     }
   },
   "limits": [
@@ -113,7 +161,7 @@
     "recall-hook-child-failure.log": "bc14cadb1f669bbbe94932136b1a93e4e247fbacca7631b02705e46a24b95e8f",
     "recall-library-benchmark.log": "466f44d4ee03364d6f28bfe85efdaf7e10e7ccde3a6a6e15a1f95b945d70e2dd"
   },
-  "checkpointState": "Candidate native semantic acceptance refuted; 200-byte header withdrawn. Other integration changes retained; final 202-byte runtime validation pending.",
+  "checkpointState": "Source implementation and local runtime qualification complete. The 200-byte model candidate is refuted and withdrawn; the retained runtime uses the original 202-byte header. Current merge/CI/release state is observed separately through PR51 and Git ancestry.",
   "sourceFiles": [
     {
       "path": "hosts/host-mcp/src/host.rs",
@@ -336,18 +384,187 @@
     }
   },
   "productionRuntimeQualification": {
-    "state": "Original 202-byte header restored; fresh source validation and clean provider-free release qualification pending.",
-    "modelQualification": "No new model trial; rejected candidate results do not qualify the retained production runtime.",
-    "evidenceDirectory": "../../../plugins/memory/evidence/production-closure-2026-11-02/runtime-release"
+    "state": "PASSED-PROVIDER-FREE-RUNTIME-CHECKS",
+    "sourceCommit": "5c246906c7edf7fb876901b610d1de8352307715",
+    "sourceTree": "9d2587d5c37869f6332c79d4a3732adac33ed39d",
+    "packageVersion": "0.1.0",
+    "sourceChecks": {
+      "headUnchanged": true,
+      "trackedCheckoutCleanAtAllPhaseChecks": true,
+      "sourceFileCount": 301,
+      "allBoundSourceHashesMatchAtEnd": true,
+      "pinnedBinaryHashesMatchAtEnd": true
+    },
+    "binaries": {
+      "elegy-memory": {
+        "sha256": "989c537e201cbc9cabfd69af416b002a4cf00cb777fa3da61a5455a4cf41795d",
+        "packageVersion": "0.1.0"
+      },
+      "elegy-memory-mcp-stdio": {
+        "sha256": "ac0e39fcabcbd6faba96b9611ae6d6168eca748a995fe3623bc2654221e912ef",
+        "packageVersion": "0.1.0"
+      }
+    },
+    "build": {
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "elegy-memory",
+        "-p",
+        "elegy-memory-mcp",
+        "--bin",
+        "elegy-memory",
+        "--bin",
+        "elegy-memory-mcp-stdio"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-11-02T14:01:46.204191+00:00",
+      "completedAt": "2026-11-02T14:03:22.308148+00:00",
+      "durationSeconds": 96.104,
+      "cargoOffline": true,
+      "modelProviderNetworkCalls": 0,
+      "profile": "release",
+      "buildMatchesSource": true
+    },
+    "localClaims": {
+      "stage": "provider-free-local-claims",
+      "sourceRevision": "5c246906c7edf7fb876901b610d1de8352307715",
+      "receiptCount": 2,
+      "ledgerEntries": 2,
+      "evidenceDirectory": "local-claims",
+      "outcomes": {
+        "forgetting.retention": "satisfied",
+        "recall.contract": "satisfied"
+      },
+      "claimStatuses": {
+        "recall.contract": "satisfied",
+        "forgetting.retention": "satisfied",
+        "host.cross-session": "unverified",
+        "host.agent-isolation": "unverified",
+        "recall.answer-quality": "unverified"
+      },
+      "buildMatchesSource": true,
+      "permittedNativeContextFromStart": true,
+      "readinessPromotion": false,
+      "providerCalls": 0
+    },
+    "nativeReplay": {
+      "stage": "provider-free-native-replay",
+      "sourceRevision": "5c246906c7edf7fb876901b610d1de8352307715",
+      "status": "completed",
+      "episodes": 8,
+      "packets": 24,
+      "sourceUnchangedPackets": 24,
+      "verifiedEmptyNamespaces": 16,
+      "nonemptyNativeContexts": 23,
+      "originalPrefixBytes": 202,
+      "originalPrefixSha256": "b4d6645648f1a4874c27c10e4c6622ee81e7fbef0452d2c18e8a98f0588e5a43",
+      "contextOverlayApplied": false,
+      "modelProviderNetworkCalls": 0,
+      "expectedPrefixFile": {
+        "bytes": 203,
+        "sha256": "a288d6c38b27b6db49befcc1be34ba15b7604233100ba07506380564f8bfc5b0",
+        "lineEndings": "CRLF"
+      },
+      "producerMetadataClarification": "The frozen producer replay-summary originalPrefixSha256 binds expected-prefix.txt including CRLF (203 bytes); this integration summary uses the 202-byte logical/native prefix hash verified against runtime and predeclaration. Original producer bytes are retained unchanged."
+    },
+    "modelCalls": 0,
+    "providerCalls": 0,
+    "cargoOfflineEnforced": true,
+    "originalSummarySha256": "582149949c0b19bac483dda03c5ebc4bb2061810226e806ba18acea4682d3450",
+    "evidenceDirectory": "../../../plugins/memory/evidence/production-closure-2026-11-02/runtime-release",
+    "limits": [
+      "Runtime mechanics only; no new model answer-quality trial or semantic reliability claim",
+      "External host and answer-quality claims remain unverified in this fresh store",
+      "No real installation, remote connectivity, or readiness promotion"
+    ]
   },
   "candidateSourceValidationCommit": "686fcb59055cf072140fee58418ede873d3d14c1",
   "candidateQualificationSourceCommit": "ef50a694238081527e2a28baa31f2e43691b8c2b",
   "currentRuntimeValidation": {
     "prefixBytesIncludingLf": 202,
+    "prefixSha256": "b4d6645648f1a4874c27c10e4c6622ee81e7fbef0452d2c18e8a98f0588e5a43",
     "runtimeAndSpecMatchBaseline": "cdcb3957b2a3d4b4bfa2eb178f914254cb436dd2",
     "hostileMultilineBoundaryTestRetained": true,
     "focusedContextualPassed": 32,
-    "fullSuites": "pending fresh rollback run",
-    "clippy": "pending fresh rollback run"
+    "fullPassed": 499,
+    "fullFailed": 0,
+    "manualBenchmarkIgnoredInOrdinarySuite": 1,
+    "manualReleaseBenchmarkPassedSeparately": true,
+    "clippyExitCode": 0,
+    "validationSummarySha256": "c7c905643f7954b4b7b6b0b6032aff3b7777b62b1e6c4222ff5121c7d70a7c41",
+    "sourceBinding": "Source tests are bound by unchanged file hashes; the release was separately built and qualified from a clean committed checkout.",
+    "reviewAfterRollback": "Runtime and spec byte-for-byte match reviewed baseline; retained hostile-data test changes only expected header/length from rejected candidate, with all other assertions unchanged."
+  },
+  "sourceValidationCommit": "5c246906c7edf7fb876901b610d1de8352307715",
+  "qualificationSourceCommit": "5c246906c7edf7fb876901b610d1de8352307715",
+  "recallBenchmark": {
+    "benchmark": "contextual-recall-library-synthetic-v1",
+    "corpus": {
+      "authorizedExpected": 1,
+      "embedding": "none",
+      "forbiddenExactMatches": 4,
+      "lexicalDistractors": 1000,
+      "minSimilarity": 0.800000011920929,
+      "rows": 1005
+    },
+    "environment": {
+      "arch": "x86_64",
+      "availableParallelism": 8,
+      "debugAssertions": false,
+      "os": "windows",
+      "sqliteVersion": "3.46.0"
+    },
+    "journal": {
+      "events": 105,
+      "expectedItems": 105,
+      "sessions": 105
+    },
+    "latencyIsMeasurementOnly": true,
+    "latencyMs": {
+      "max": 412.3922,
+      "p50": 255.40610000000004,
+      "p95": 345.9311
+    },
+    "limits": "single local warm lexical workload; no provider, embedding, host-hook, concurrent writer, or production database measurement",
+    "p95TargetMet": true,
+    "p95TargetMs": 500.0,
+    "path": "in-process lexical recall; includes source open, ranking, and journal commit",
+    "sampling": {
+      "freshSessionPerCall": true,
+      "measuredCalls": 100,
+      "percentileMethod": "nearest-rank",
+      "setupAndAssertionsTimed": false,
+      "sharedJournal": true,
+      "warmupCalls": 5
+    },
+    "source": {
+      "bytesUnchanged": true,
+      "countersUnchanged": true,
+      "databaseBytes": 774144,
+      "sha256": "331aa2a5e5410f5b6f5c9b87bc3250c7b8e8a86a1436f48fb47f18366dfd0b4f",
+      "walBytes": 0,
+      "walUnchanged": true
+    },
+    "sourceRevision": "5c246906c7edf7fb876901b610d1de8352307715",
+    "providerFree": true,
+    "cargoOffline": true,
+    "measurementLoad": {
+      "rootCoordinatesNoCompetingCargoOrScans": true,
+      "universalIdleMachineClaim": false
+    }
+  },
+  "preservedEvidence": {
+    "directory": "../../../plugins/memory/evidence/production-closure-2026-11-02",
+    "files": 317,
+    "manifestEntries": 316,
+    "manifestSha256": "5cf0eea93fe83b14b8278dd8e1df879921eea19a9f4fb31269391bf707a1b69a",
+    "baselineAndOverlayAndRejectedCandidateRawAnswersUnchanged": 120,
+    "nativeRejectedCandidateChecks": 517,
+    "finalProviderFreeChecks": 409,
+    "newModelAnswerQualityClaim": false
   }
 }

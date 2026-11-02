@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "-p",
+    "elegy-memory",
+    "--test",
+    "recall_performance",
+    "--",
+    "--ignored",
+    "--nocapture"
+  ],
+  "exitCode": 0,
+  "startedAt": "2026-11-02T13:59:30.359407+00:00",
+  "completedAt": "2026-11-02T14:01:36.254152+00:00",
+  "durationSeconds": 125.896,
+  "cargoOffline": true,
+  "modelProviderNetworkCalls": 0
+}

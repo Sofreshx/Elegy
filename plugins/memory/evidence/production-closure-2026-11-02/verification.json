@@ -1459,8 +1459,8 @@
       "meaning": "Preservation passes; native 200-byte candidate acceptance REFUTED, 23/24 required24."
     },
     {
-      "path": "runtime-release/README.md",
-      "meaning": "Final provider-free 202-byte production proof PENDING; no result inferred."
+      "path": "runtime-release/verification.json",
+      "meaning": "Final 202-byte provider-free runtime mechanics passed; zero new model calls, no answer-quality qualification."
     }
   ],
   "gitWhitespaceMetadataFollowup": {

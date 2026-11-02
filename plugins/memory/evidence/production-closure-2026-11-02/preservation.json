@@ -613,10 +613,13 @@
   },
   "separateFinalRuntimeQualification": {
     "directory": "runtime-release",
-    "status": "PENDING",
+    "status": "PASSED-PROVIDER-FREE-RUNTIME-CHECKS",
+    "sourceRevision": "5c246906c7edf7fb876901b610d1de8352307715",
     "headerBytes": 202,
     "providerFree": true,
-    "additionalHostedModelCalls": 0
+    "additionalHostedModelCalls": 0,
+    "answerQualityRequalified": false,
+    "externalClaimsUnverified": 3
   },
   "generatedBytePreservationMetadata": {
     "path": ".gitattributes",

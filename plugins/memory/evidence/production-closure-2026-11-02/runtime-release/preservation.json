@@ -1,0 +1,400 @@
+{
+  "schemaVersion": "memory-provider-free-runtime-preservation/v1",
+  "status": "PRESERVED-PROVIDER-FREE-RUNTIME-PASS",
+  "sourceLabel": "closed production-runtime-20261102 scratch",
+  "sourceRevision": "5c246906c7edf7fb876901b610d1de8352307715",
+  "preservedLosslessly": [
+    {
+      "path": "approved-head.txt",
+      "sourcePath": "approved-head.txt",
+      "sha256": "42c7fa0cb58f7c54b9c21725da35b736010a94c288b43b3ffe392cdd9fbbb6ec",
+      "bytes": 42,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "clean-head-binding.json",
+      "sourcePath": "clean-head-binding.json",
+      "sha256": "5e1b7fe0148822d953e6eea75b221633b4fe334d9d27f1d53ca9405906c9b256",
+      "bytes": 884,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "expected-prefix.txt",
+      "sourcePath": "expected-prefix.txt",
+      "sha256": "a288d6c38b27b6db49befcc1be34ba15b7604233100ba07506380564f8bfc5b0",
+      "bytes": 203,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "harness/corpus.json",
+      "sourcePath": "harness/corpus.json",
+      "sha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b",
+      "bytes": 33163,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "harness/protocol.json",
+      "sourcePath": "harness/protocol.json",
+      "sha256": "7cd6dc54bef7f90729c64f54f728b881d54297d9bb56bb16794a24ee718d687e",
+      "bytes": 1280,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "harness/protocol.original.json",
+      "sourcePath": "harness/protocol.original.json",
+      "sha256": "df253c5683deb07bac3b28f89bf80bbaef6fce21ea6a9086fed95f461e2acc4b",
+      "bytes": 5563,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "harness-copy-hashes.json",
+      "sourcePath": "harness-copy-hashes.json",
+      "sha256": "99e47145140052711e90791e7a634614523901bde16da3b7e5fe3ef447d08ddb",
+      "bytes": 268,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "local-claim-forgetting-retention.json",
+      "sourcePath": "local-claim-forgetting-retention.json",
+      "sha256": "e71fe695a3066f5c02486f841b19952c7e6ddca4b3cf01aeb3203dbe76524ba4",
+      "bytes": 5038,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "local-claim-forgetting-retention.log",
+      "sourcePath": "local-claim-forgetting-retention.log",
+      "sha256": "e2fbb18e4a0edaea86914dcafedd23fe6d846d9bf00ac26225f6e00c00279aba",
+      "bytes": 4889,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "local-claim-history.json",
+      "sourcePath": "local-claim-history.json",
+      "sha256": "aed15b9c79ed04c2bd3ea7769863593d6659019b72610bd074c7658e01acc95f",
+      "bytes": 9049,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "local-claim-history.log",
+      "sourcePath": "local-claim-history.log",
+      "sha256": "cc9c58bade0b5d08008049ccfe089e745212645d74345b798ecd8929f15e35a1",
+      "bytes": 8787,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "local-claim-recall-contract.json",
+      "sourcePath": "local-claim-recall-contract.json",
+      "sha256": "fb089cbbee930aab73c6314350f36005ee7a9ee14fa208bb0a9417395fad55c0",
+      "bytes": 3691,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "local-claim-recall-contract.log",
+      "sourcePath": "local-claim-recall-contract.log",
+      "sha256": "9e3fbc5e44432fd4db1ed34ffd25373f2159d7a6e1b1960ef9bc22682ca81140",
+      "bytes": 3571,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "local-claim-summary.json",
+      "sourcePath": "local-claim-summary.json",
+      "sha256": "e42e23b56d617dd7f1a406d6c21fd8626bd144f9ee2d87a8a0962016658a89d8",
+      "bytes": 662,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "local-claims/ledger.json",
+      "sourcePath": "local-claims/ledger.json",
+      "sha256": "0863f365f438eedd00127cd83c767e80f71b9f056080a84b02255d3108198bf0",
+      "bytes": 245,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "local-claims/receipts/42535645-d7a3-4f8d-ad5b-fef429f0e8c2.json",
+      "sourcePath": "local-claims/receipts/42535645-d7a3-4f8d-ad5b-fef429f0e8c2.json",
+      "sha256": "bb043dc0e3968608673945822062819f083952b82c14c70d2854b17dc330176e",
+      "bytes": 4796,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "local-claims/receipts/9186c17b-6dab-488a-8331-65427506b85a.json",
+      "sourcePath": "local-claims/receipts/9186c17b-6dab-488a-8331-65427506b85a.json",
+      "sha256": "ac1393321ea9f0458dfe461af32b7d88a4da553a3a4c6e340998fac689c13696",
+      "bytes": 3478,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "predeclaration.json",
+      "sourcePath": "predeclaration.json",
+      "sha256": "e7783455f503483ee613eab896b773b8d8e62997d26979e17169dbb8a938c2bb",
+      "bytes": 1965,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "protocol.template.json",
+      "sourcePath": "protocol.template.json",
+      "sha256": "714494e204b89ae3642e6a3d72f4e09daf73bf4444049e50e05070aa85536b29",
+      "bytes": 1267,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "qualification-summary.json",
+      "sourcePath": "qualification-summary.json",
+      "sha256": "582149949c0b19bac483dda03c5ebc4bb2061810226e806ba18acea4682d3450",
+      "bytes": 55118,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "release-benchmark-execution.json",
+      "sourcePath": "release-benchmark-execution.json",
+      "sha256": "91bfb1da05bf36954161d6b0920999f66947d57eb12c7883ccff384d134d6fe2",
+      "bytes": 426,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "release-benchmark.json",
+      "sourcePath": "release-benchmark.json",
+      "sha256": "48666354ceb3688b57f508da1426da2c02ec1e15cc5f26878219f6a07c52c648",
+      "bytes": 1631,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "release-build-execution.json",
+      "sourcePath": "release-build-execution.json",
+      "sha256": "46c8ff673eba6f2379450e253756e206fca604c95e217a67cc117e22d2cb5234",
+      "bytes": 451,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "release-build.json",
+      "sourcePath": "release-build.json",
+      "sha256": "9b4e815cd49345cff1bfb941e02b136fbc185cd76ba54b65c8f68e2a9c35f352",
+      "bytes": 48496,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "release-source-before.json",
+      "sourcePath": "release-source-before.json",
+      "sha256": "8ecc115d9dcd5d6e27f6d35065003f04d6a5d79611f6cec812e00e4beeecf00c",
+      "bytes": 47534,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "replay-01/ares/run.json",
+      "sourcePath": "replay-01/ares/run.json",
+      "sha256": "43e0502b51c81363dca35e5c54cc683662f0bdbf7c25c6e2c7dc0fb77cf9efef",
+      "bytes": 63492,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "replay-01/cedar/run.json",
+      "sourcePath": "replay-01/cedar/run.json",
+      "sha256": "c15eae86c60d689b103ebe58d917391baf203f6e53b09df70d08d223afaaa5e6",
+      "bytes": 63724,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "replay-01/galen/run.json",
+      "sourcePath": "replay-01/galen/run.json",
+      "sha256": "9db3122789de72ce52e76604e013a8d887ee8d533aa5d6590ed20a79676d2d50",
+      "bytes": 85199,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "replay-01/harbor/run.json",
+      "sourcePath": "replay-01/harbor/run.json",
+      "sha256": "ffdc93aec9cb2bd0558fd0ca7b4dc676ce0abeb4edc0559c8e864959fbb6ba96",
+      "bytes": 64750,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "replay-01/lumen/run.json",
+      "sourcePath": "replay-01/lumen/run.json",
+      "sha256": "fe0f3f07b6bdbc75b40e8cc8afacf519fd566bfc6627c44b1c35853872a46074",
+      "bytes": 64335,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "replay-01/quill/run.json",
+      "sourcePath": "replay-01/quill/run.json",
+      "sha256": "3d0b3ae53acc768c431c02ce578780045b8c14178a4d9d364f8056f2eb635c10",
+      "bytes": 44872,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "replay-01/run.json",
+      "sourcePath": "replay-01/run.json",
+      "sha256": "c2d976adc16d3f18abed66aa8e2a82f3227de3d197d1aafa2b1dadf439fc3505",
+      "bytes": 1627,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "replay-01/sable/run.json",
+      "sourcePath": "replay-01/sable/run.json",
+      "sha256": "31caf915ebfa9a654dbb54c50425f55caddf20846ed9a87e7b3a4263b82b6330",
+      "bytes": 72366,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "replay-01/vesper/run.json",
+      "sourcePath": "replay-01/vesper/run.json",
+      "sha256": "3ce42881c9775d60757bc10b8281c9ecb1c5b0c4fc70bd0c7ad548d8d89d28c2",
+      "bytes": 315839,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "replay-01.log",
+      "sourcePath": "replay-01.log",
+      "sha256": "a1858b8c3923baffa04271cac91177170a6176c822877e923334cc4d6afc507f",
+      "bytes": 577,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "replay-summary.json",
+      "sourcePath": "replay-summary.json",
+      "sha256": "d3e20b163c672c26b30fee42882472e1f315b42578413c877eaf0084b0b3de7b",
+      "bytes": 471,
+      "sourceBytesEqual": true
+    },
+    {
+      "path": "source-sha256-manifest.json",
+      "sourcePath": "sha256-manifest.json",
+      "sha256": "260abd001a693c940d5b8b0f9f20514aebe3751619ee3f8e8017ff1fa34a7a62",
+      "bytes": 8570,
+      "sourceBytesEqual": true
+    }
+  ],
+  "derivedCopies": [],
+  "omittedPathBearingOriginals": [
+    {
+      "sourcePath": "local-claim-forgetting-retention-execution.json",
+      "sourceSha256": "93361759156fab880cee08c17b78ba7949375871435292bff853e9cdf023ce3a",
+      "bytes": 699,
+      "omissionReason": "Machine-specific paths in auxiliary script, captured command, next/status template or build log; unchanged original retained in scratch.",
+      "originalRetainedInScratch": true
+    },
+    {
+      "sourcePath": "local-claim-history-execution.json",
+      "sourceSha256": "a325135fab61879a34b5b16b4fe3fbef80177d39c9f2e6c525be2eff6d0809d1",
+      "bytes": 658,
+      "omissionReason": "Machine-specific paths in auxiliary script, captured command, next/status template or build log; unchanged original retained in scratch.",
+      "originalRetainedInScratch": true
+    },
+    {
+      "sourcePath": "local-claim-next-execution.json",
+      "sourceSha256": "ea98f7949c2534b84c852d8d2a9f1b796a28d9eba217e125003a5913f33ba569",
+      "bytes": 655,
+      "omissionReason": "Machine-specific paths in auxiliary script, captured command, next/status template or build log; unchanged original retained in scratch.",
+      "originalRetainedInScratch": true
+    },
+    {
+      "sourcePath": "local-claim-next.json",
+      "sourceSha256": "2d734699ab0e9db9cdb649a06aa6cedb9d1cf5b9304e84cbd48358fbd5061877",
+      "bytes": 2628,
+      "omissionReason": "Machine-specific paths in auxiliary script, captured command, next/status template or build log; unchanged original retained in scratch.",
+      "originalRetainedInScratch": true
+    },
+    {
+      "sourcePath": "local-claim-next.log",
+      "sourceSha256": "79ad4e0583547047047a97c1968cb48e0cf5e93288b4ec56a894ab496d45219e",
+      "bytes": 2559,
+      "omissionReason": "Machine-specific paths in auxiliary script, captured command, next/status template or build log; unchanged original retained in scratch.",
+      "originalRetainedInScratch": true
+    },
+    {
+      "sourcePath": "local-claim-recall-contract-execution.json",
+      "sourceSha256": "f4c47eec884a11ee173139d81b3d4a44c472117c0a47cb73afacd216c4bc3e95",
+      "bytes": 694,
+      "omissionReason": "Machine-specific paths in auxiliary script, captured command, next/status template or build log; unchanged original retained in scratch.",
+      "originalRetainedInScratch": true
+    },
+    {
+      "sourcePath": "local-claim-status-execution.json",
+      "sourceSha256": "820dc4bdaf6d2d6175db0864b0e89cbb79d07aa29de8ebb8e9fbd9ae9e6a2b17",
+      "bytes": 657,
+      "omissionReason": "Machine-specific paths in auxiliary script, captured command, next/status template or build log; unchanged original retained in scratch.",
+      "originalRetainedInScratch": true
+    },
+    {
+      "sourcePath": "local-claim-status.json",
+      "sourceSha256": "c1b5991a5cfcf0a5b5e1ea47e0df9a69e3271827aa1163f42c38143bd672a2f0",
+      "bytes": 13267,
+      "omissionReason": "Machine-specific paths in auxiliary script, captured command, next/status template or build log; unchanged original retained in scratch.",
+      "originalRetainedInScratch": true
+    },
+    {
+      "sourcePath": "local-claim-status.log",
+      "sourceSha256": "37773a3771be3eee16a84161f99f9462b95f1661cf20930f39167e5d74ce0561",
+      "bytes": 12965,
+      "omissionReason": "Machine-specific paths in auxiliary script, captured command, next/status template or build log; unchanged original retained in scratch.",
+      "originalRetainedInScratch": true
+    },
+    {
+      "sourcePath": "qualify_runtime.py",
+      "sourceSha256": "0fe614d9ae5c6bb5ea014040262aa248769298a8b6e6b95348ef091fe0d31f7d",
+      "bytes": 12578,
+      "omissionReason": "Machine-specific paths in auxiliary script, captured command, next/status template or build log; unchanged original retained in scratch.",
+      "originalRetainedInScratch": true
+    },
+    {
+      "sourcePath": "release-benchmark.log",
+      "sourceSha256": "f87217a2d841d57d3d19c97643b3e3a93000cdbeab474ef7a717017660df4739",
+      "bytes": 1569,
+      "omissionReason": "Machine-specific paths in auxiliary script, captured command, next/status template or build log; unchanged original retained in scratch.",
+      "originalRetainedInScratch": true
+    },
+    {
+      "sourcePath": "release-build.log",
+      "sourceSha256": "e27b35d36197c8182f0c1b367a7807104b6a1786e64266c74de2eee85a1e93eb",
+      "bytes": 277,
+      "omissionReason": "Machine-specific paths in auxiliary script, captured command, next/status template or build log; unchanged original retained in scratch.",
+      "originalRetainedInScratch": true
+    },
+    {
+      "sourcePath": "replay-01-execution.json",
+      "sourceSha256": "cd54fdc373b81f688564e65748b5e4b36d6ca2515c7efbfe99dfa0f83015c215",
+      "bytes": 865,
+      "omissionReason": "Machine-specific paths in auxiliary script, captured command, next/status template or build log; unchanged original retained in scratch.",
+      "originalRetainedInScratch": true
+    }
+  ],
+  "reusedHistoricalScripts": [
+    {
+      "sourcePath": "harness/rpc_support.py",
+      "reusedFrom": "../../realistic-2026-10-23/rpc_support.py",
+      "sha256": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759"
+    },
+    {
+      "sourcePath": "harness/run_replay.py",
+      "reusedFrom": "../../realistic-2026-10-23/run_replay.py",
+      "sha256": "7c75b033edda96063a5f71e2f95d7b2c3d685e25d6dbd39fbaf3eb5518da0d26"
+    }
+  ],
+  "generatedBytePreservationMetadata": {
+    "path": ".gitattributes",
+    "sha256": "22106984a6c1274ead5c283789ca11d75b303658949aaa627698747e7b2d6160",
+    "policy": "* -text whitespace=trailing-space,space-before-tab,cr-at-eol",
+    "rawBytesRewritten": false
+  },
+  "scopeLimits": [
+    "Zero new model/provider/network calls; no answer-quality certification.",
+    "Successful local receipts and ledger copied unchanged; omitted status/next templates are hash-bound and safe statuses remain in local-claim-summary.json.",
+    "No executable, database/WAL/runtime state, client store, private configuration or credential copied.",
+    "Earlier baseline, overlay and rejected native candidate originals remain unchanged."
+  ],
+  "publicationGate": "Root-owned; preservation worker did not read private publication policy.",
+  "producerPrefixHashMetadataClarification": {
+    "classification": "producer-metadata-erratum-only",
+    "producerFields": [
+      "replay-summary.json:/originalPrefixSha256",
+      "qualification-summary.json:/nativeReplay/originalPrefixSha256"
+    ],
+    "producerValueHashes": "unchanged 203-byte CRLF expected-prefix.txt file",
+    "rawFileBytes": 203,
+    "rawFileSha256": "a288d6c38b27b6db49befcc1be34ba15b7604233100ba07506380564f8bfc5b0",
+    "logicalNativePrefixBytes": 202,
+    "logicalNativePrefixSha256": "b4d6645648f1a4874c27c10e4c6622ee81e7fbef0452d2c18e8a98f0588e5a43",
+    "verificationTransform": "UTF-8 decode with CRLF-to-LF normalization, for comparison only; all copied source bytes remain unchanged",
+    "nativeBehaviorError": false
+  }
+}
