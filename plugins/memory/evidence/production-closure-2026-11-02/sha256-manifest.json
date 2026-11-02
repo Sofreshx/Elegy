@@ -1,7 +1,7 @@
 {
   "schemaVersion": "memory-portable-sha256-manifest/v1",
   "algorithm": "sha256",
-  "scope": "All files under this directory except sha256-manifest.json itself; external frozen scripts are bound in preservation/verification files.",
+  "scope": "All baseline and separately scoped overlay files under this directory except sha256-manifest.json itself; external frozen scripts are bound in preservation/verification files.",
   "files": [
     {
       "path": ".gitattributes",
@@ -294,6 +294,196 @@
       "bytes": 621
     },
     {
+      "path": "overlay-experiment/.gitattributes",
+      "sha256": "705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da",
+      "bytes": 8
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q01_with.json",
+      "sha256": "b05efce1b7e5ed34907ebb8f512ae99cef65d7add937a5171e12d244b1f73921",
+      "bytes": 1754
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q02_with.json",
+      "sha256": "23e53500afc01d5158232de99ef07c8bface8f993435ebb4914f97554378762b",
+      "bytes": 2229
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q03_with.json",
+      "sha256": "ce0439620a6ee39bbbd5057aca7f40d9865e842c1083fbd168f3f6a9deb6541b",
+      "bytes": 1804
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q04_with.json",
+      "sha256": "0bf62d29bbcebd5e9f4f3768562126412f030a7ada4cb9d63e3e9588ef0cb1d5",
+      "bytes": 1844
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q05_with.json",
+      "sha256": "13e30b917bb1266db83e0b17fdfd706399eb7704a6356b905405e098d0d372b3",
+      "bytes": 1780
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q06_with.json",
+      "sha256": "4d6335287755724cb8b07601cfeb3bad02591e68c87bfa1a20dd8658115b48b9",
+      "bytes": 1810
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q07_with.json",
+      "sha256": "7abb85f875a09b3b71a6b5aed6679f9ba475e2522e92197bfac21d1223d4284f",
+      "bytes": 1793
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q08_with.json",
+      "sha256": "897aeb8b73759db7d5f5b8207f10af5b70d325d5c8eabdf7a82d00aae495bfca",
+      "bytes": 1799
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q09_with.json",
+      "sha256": "ebaa07cceeb234a46d1fcdee926226bd9ab969a5cf9c344397e2f689001b2d71",
+      "bytes": 1860
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q10_with.json",
+      "sha256": "5585982abd914933c81386df4de6211f0f3b9bd544723f7559faa38a954971ef",
+      "bytes": 1833
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q11_with.json",
+      "sha256": "d967654406c07d56cba100a4877971035a7b93c338cd29ec89c098d7feb70c6a",
+      "bytes": 1738
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q12_with.json",
+      "sha256": "137265054c926809a0edc8f217e612031a21556e8b1c7c2364ef0694c4a93b2e",
+      "bytes": 1792
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q13_with.json",
+      "sha256": "448491363c6f150d13ad5ebd949cf569d25516a2f8f97f414b9152d9106b616b",
+      "bytes": 1766
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q14_with.json",
+      "sha256": "017cd38127dc329beac92034cded9a2dacf74ecfcf9c43c1f899a48bd80eedfd",
+      "bytes": 1772
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q15_with.json",
+      "sha256": "a81716c244c611e3643c3621f28ed73ef4f496f962a584ff50b94237b4a1a488",
+      "bytes": 1775
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q16_with.json",
+      "sha256": "5e36e5a1de1dae18c772a61095e242e44389f5738cfc40a59dddcc2d48fab804",
+      "bytes": 1856
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q17_with.json",
+      "sha256": "8554e68d7a0e86120e369868a3c038e0196d9a7907306224c2c46e5c8f9215a0",
+      "bytes": 1826
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q18_with.json",
+      "sha256": "849230bbc0dc7a8358f602049ac9c1cb5e5e0af3f9b975cff0344eedcd06a7ea",
+      "bytes": 1764
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q19_with.json",
+      "sha256": "60a0b82e9414657d74ce9d660533f6272ddfe849fe8f25ad7ba777e8556a17ef",
+      "bytes": 1780
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q20_with.json",
+      "sha256": "da0f2b29b390b3e890bdb61099f1611f7bc40b4ef6a170616ccc467a2c3f5387",
+      "bytes": 1786
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q21_with.json",
+      "sha256": "3030ddff524ddbd49e58d31c6166fb9fec20b9f0c0f2e8b17e586e7feaf1dd0c",
+      "bytes": 1868
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q22_with.json",
+      "sha256": "5a1f133016dc4f79e31175ac29bfa26472ab61813bfc474e2f0a569766c200fa",
+      "bytes": 1733
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q23_with.json",
+      "sha256": "ca4504a618798c66c83a60b16185197f140e825a3ccf552416c7166ea809b6cb",
+      "bytes": 3663
+    },
+    {
+      "path": "overlay-experiment/answers-01/raw/q24_with.json",
+      "sha256": "798aee024886c4cd91499a3df74355b69463d590d651f89737cdf29d803e508a",
+      "bytes": 1692
+    },
+    {
+      "path": "overlay-experiment/answers-01/run.json",
+      "sha256": "0927833e2003f52b409f9da0f67b0565dc87c223689a7b9578e1ad94a3a23306",
+      "bytes": 5615
+    },
+    {
+      "path": "overlay-experiment/answers-01.log",
+      "sha256": "001806c071d58dc637dc5b6b855f829d96c4e4e9f26f7481c58b145fca6f7aab",
+      "bytes": 1808
+    },
+    {
+      "path": "overlay-experiment/assessment.json",
+      "sha256": "167874c1aba8cdecf42bb63692eba6ebb2776252e3686a2d1b3f3f93964919f5",
+      "bytes": 21000
+    },
+    {
+      "path": "overlay-experiment/candidate.txt",
+      "sha256": "c0b4adc6caff9c3fa8231c260efd14866e13fe4b760a78354d7195a10553e3c1",
+      "bytes": 200
+    },
+    {
+      "path": "overlay-experiment/original.txt",
+      "sha256": "b4d6645648f1a4874c27c10e4c6622ee81e7fbef0452d2c18e8a98f0588e5a43",
+      "bytes": 202
+    },
+    {
+      "path": "overlay-experiment/predeclaration.json",
+      "sha256": "7749cb8f927c9788c27b777d0a45be7f675789fc02f52fa69d70795eb1ede756",
+      "bytes": 2510
+    },
+    {
+      "path": "overlay-experiment/preservation.json",
+      "sha256": "66793543906fccb6a9e0cb00e78d8c36405b22d7238cddd3ce8bcbc2f5fc41a7",
+      "bytes": 7322
+    },
+    {
+      "path": "overlay-experiment/README.md",
+      "sha256": "c00e74211caed5efd2c5176de4d743b4e072105b7b7713d2ddc55ce8c235b6ef",
+      "bytes": 4097
+    },
+    {
+      "path": "overlay-experiment/run_experiment.py",
+      "sha256": "e20c1d9eec675f1d849f5654f24e5b6151e77edd0595017627c9654e1e642c34",
+      "bytes": 8660
+    },
+    {
+      "path": "overlay-experiment/semantic-review.json",
+      "sha256": "b23215e5765e7959031b6a2d7fc29d7b7a2d309b2584cc63086be7272ecde132",
+      "bytes": 11077
+    },
+    {
+      "path": "overlay-experiment/source-and-overlay-packets.json",
+      "sha256": "8f7dbd5924d584ad9d2722b71e29dcfa5ef21ab1cd99bf6253fe6a5bab48a4ed",
+      "bytes": 132337
+    },
+    {
+      "path": "overlay-experiment/verdict.json",
+      "sha256": "c2933142a827d90b1b077b8b70212fb8e2f6318ae47e17423e650397b14cd73a",
+      "bytes": 3229
+    },
+    {
+      "path": "overlay-experiment/verification.json",
+      "sha256": "9c72ea3cb042c9f3ae2d951db89781c45636964d19a73963cf4a8b40466c45d0",
+      "bytes": 54691
+    },
+    {
       "path": "preflight-01/run.json",
       "sha256": "1a79d9f20ea0b176ba67e7f04736208e89ca05c6b144d86b3a357372f33bfc04",
       "bytes": 2093
@@ -320,8 +510,8 @@
     },
     {
       "path": "preservation.json",
-      "sha256": "b91d1da5a34fb45ac2ad2bdaaaeb2e8c8cf5c99e505354e17be5feeb1bb839e6",
-      "bytes": 21095
+      "sha256": "5a40b77cff3fe4cc5a45e09ddd09707a8dbef2975c357b980cbf6b71ac027256",
+      "bytes": 21226
     },
     {
       "path": "qualification-summary.json",
@@ -330,8 +520,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "2428754db489dc51e2717e6b9945f355215bf4d9fc4edf3daf71ab0656df34b6",
-      "bytes": 9336
+      "sha256": "b0556b7918e12077896e665bb70462214ea158b2b83d1b425b352d1489097e7c",
+      "bytes": 9955
     },
     {
       "path": "release-artifact-pin.json",

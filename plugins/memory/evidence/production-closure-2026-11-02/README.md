@@ -1,16 +1,23 @@
 ---
-title: Current-source Memory regression evidence, 2 November 2026
+title: Memory baseline before the field-policy fix and controlled overlay, 2 November 2026
 status: active
 owner: Elegy Memory
 doc_kind: guide
 ---
 
-# Current-source Memory regression evidence
+# Memory baseline before the field-policy fix
 
-**The answer-quality gate remains blocked.** This is a replay of the known
-24-question synthetic regression corpus, with 48 new isolated Codex answers.
+**The baseline answer-quality gate remains blocked.** This baseline records source
+`cdcb3957b2a3d4b4bfa2eb178f914254cb436dd2`, **before the field-policy fix**.
+It replays the known 24-question synthetic regression corpus with 48 isolated Codex
+answers. Its adverse responses, frozen scores and blocked verdict remain unchanged.
 It does not establish readiness for autonomous use or promote a readiness stage.
-The separately evaluated prompt-overlay experiment is excluded from this directory.
+
+The distinct [controlled prompt-overlay candidate experiment](overlay-experiment/README.md)
+is preserved in its own subdirectory: 24 new with-only answers, zero new without
+answers, nine predeclared criteria recorded passed, and no native runtime change.
+Its candidate result is not a fresh paired A/B claim or native/source qualification.
+Any native verification belongs to a later, separately bound source phase.
 
 The tested source is `cdcb3957b2a3d4b4bfa2eb178f914254cb436dd2`, tree
 `40b9eff9085b76a76643892c84918b1ef53fbb94`, workspace package version `0.1.0`.
@@ -72,7 +79,7 @@ original clean-release bytes used in replay:
 
 ## Preservation and offline reproduction
 
-[Preservation provenance](preservation.json) records 79 byte-identical copied files,
+Baseline [preservation provenance](preservation.json) records 79 byte-identical copied files,
 three explicitly derived JSON receipts, original and derived hashes, omitted-source
 hashes, and retained original hash references. The only substitutions in
 `subject.json`, `release-build.json` and `qualification-summary.json` replace the
@@ -144,6 +151,6 @@ the hosted model alias is mutable and there is one realization per arm. The reus
 `answer_runner.configuration` and `answer_runner.invoke` functions, frozen prompt,
 exact configuration, ordering and saved packets are retained. The historical runner's
 `main` queries login status and lacks this campaign's stop-on-pending orchestration;
-it is not an exact replacement for the omitted wrapper. No fresh model campaign,
-readiness promotion, second-host qualification, daily-use measurement, statistical
-generalization or monetary saving is claimed here.
+it is not an exact replacement for the omitted wrapper. No additional model call was made during preservation. Neither this baseline nor
+the controlled overlay establishes readiness promotion, second-host qualification,
+daily-use reliability, statistical generalization or monetary saving.

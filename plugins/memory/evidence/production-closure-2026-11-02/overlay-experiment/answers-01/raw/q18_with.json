@@ -1,0 +1,43 @@
+{
+  "answer": "Conserver ces traces pendant 75 minutes et utiliser le mécanisme REPLAY_PINE.",
+  "threadId": "01a19c29-f269-7672-9382-e1035799b3ab",
+  "usage": {
+    "input_tokens": 21057,
+    "cached_input_tokens": 16512,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 65,
+    "reasoning_output_tokens": 41
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a19c29-f269-7672-9382-e1035799b3ab\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Conserver ces traces pendant 75 minutes et utiliser le mécanisme REPLAY_PINE.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":21057,\"cached_input_tokens\":16512,\"cache_write_input_tokens\":0,\"output_tokens\":65,\"reasoning_output_tokens\":41}}\n",
+  "stderr": "2026-11-02T12:09:17.179761Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q18",
+  "arm": "with",
+  "startedAt": "2026-11-02T12:09:16.725508+00:00",
+  "completedAt": "2026-11-02T12:09:25.258512+00:00",
+  "elapsedMs": 8532.433,
+  "promptSha256": "1c8c3501022576570bf8dbfc1f489f6ce90193d5dc896b8e447fc0e678cb21cf",
+  "configurationSha256": "b9206274c525e55b519b8f84f435cbc9d2cec51d2bea53ac7d98b13be5982348",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

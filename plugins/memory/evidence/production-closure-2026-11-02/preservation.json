@@ -484,7 +484,6 @@
   "frozenScriptsReusedFrom": "../realistic-2026-10-23",
   "copyVerification": "all selected source and destination bytes match SHA-256",
   "sourceRuntimeRetainedInScratch": true,
-  "promptOverlayExperimentIncluded": false,
   "publicationGate": "root-owned; not performed by preservation worker",
   "derivedCopies": [
     {
@@ -601,5 +600,7 @@
     },
     "publicPortableTreeAbsoluteMachinePathsDetected": 0,
     "limits": "Structural path patterns only; root-owned publication policy scan remains separate."
-  }
+  },
+  "promptOverlayExperimentIncludedInBaseline": false,
+  "separateControlledExperiment": "overlay-experiment; 24 new with-only, zero new without; no baseline result replaced"
 }
