@@ -1,0 +1,29 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "-p",
+    "elegy-memory",
+    "-p",
+    "elegy-memory-mcp",
+    "--bin",
+    "elegy-memory",
+    "--bin",
+    "elegy-memory-mcp-stdio"
+  ],
+  "exitCode": 0,
+  "durationSeconds": 2.924,
+  "reason": "Restore original release feature graph after Cargo benchmark replaced the CLI target artifact",
+  "binaries": {
+    "elegy-memory.exe": {
+      "sha256": "3f7cc338a8550726e8ed9d11ea2e0eca39bba58deea35e6f37c2d9f58091cc72",
+      "matchesOriginalCleanReleaseBuild": true
+    },
+    "elegy-memory-mcp-stdio.exe": {
+      "sha256": "a4410052a9004234ce9157a2ba39dadaac11dc700d67cfa1799468fd1787918a",
+      "matchesOriginalCleanReleaseBuild": true
+    }
+  }
+}

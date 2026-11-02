@@ -1,0 +1,383 @@
+{
+  "schemaVersion": "memory-realistic-answers/v1",
+  "startedAt": "2026-11-02T11:59:54.284593+00:00",
+  "status": "completed",
+  "model": "gpt-5.6-luna",
+  "reasoningEffort": "medium",
+  "configuration": {
+    "argv": [
+      "<codex>",
+      "exec",
+      "--ignore-user-config",
+      "--ephemeral",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "--json",
+      "-C",
+      "<scratch-case>",
+      "-m",
+      "gpt-5.6-luna",
+      "-c",
+      "model_reasoning_effort=\"medium\"",
+      "-c",
+      "project_doc_max_bytes=0",
+      "-"
+    ],
+    "executableSha256": "3097c909fb6d5cd63510d44aceb1d42df9f6e85722a3e447e477def1ecf60e16",
+    "environment": "API keys/endpoints/Memory bindings removed; existing ChatGPT login only"
+  },
+  "configurationSha256": "b9206274c525e55b519b8f84f435cbc9d2cec51d2bea53ac7d98b13be5982348",
+  "codexSha256": "3097c909fb6d5cd63510d44aceb1d42df9f6e85722a3e447e477def1ecf60e16",
+  "codexVersion": "codex-cli 0.166.0-alpha.5.1",
+  "corpusSha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b",
+  "protocolSha256": "107cebacdc0eddeda7fe90640400741fcb83b0743013521d1d7513b1eef53147",
+  "runnerSha256": "9bd417a00518bccc0d61e75908996e0bdc80b62db9a6b96e8e278f831994ae0b",
+  "orchestratorSha256": "51c6df5b46dabd0932341dc742da80d203ea804f509f443d2c3315a4338c7df7",
+  "ordinaryChatGPTAuth": true,
+  "paidApiCalls": 0,
+  "loginStatusQueried": false,
+  "quotaQueried": false,
+  "sourceRevision": "cdcb3957b2a3d4b4bfa2eb178f914254cb436dd2",
+  "answers": [
+    {
+      "caseId": "q01",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 5653.664,
+      "issues": []
+    },
+    {
+      "caseId": "q01",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6687.907,
+      "issues": []
+    },
+    {
+      "caseId": "q02",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 12525.044,
+      "issues": []
+    },
+    {
+      "caseId": "q02",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 8666.641,
+      "issues": []
+    },
+    {
+      "caseId": "q03",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 8405.766,
+      "issues": []
+    },
+    {
+      "caseId": "q03",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 11260.447,
+      "issues": []
+    },
+    {
+      "caseId": "q04",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7342.841,
+      "issues": []
+    },
+    {
+      "caseId": "q04",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 9665.557,
+      "issues": []
+    },
+    {
+      "caseId": "q05",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7735.704,
+      "issues": []
+    },
+    {
+      "caseId": "q05",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6501.728,
+      "issues": []
+    },
+    {
+      "caseId": "q06",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7838.601,
+      "issues": []
+    },
+    {
+      "caseId": "q06",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 8716.898,
+      "issues": []
+    },
+    {
+      "caseId": "q07",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7297.189,
+      "issues": []
+    },
+    {
+      "caseId": "q07",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 7407.965,
+      "issues": []
+    },
+    {
+      "caseId": "q08",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7752.845,
+      "issues": []
+    },
+    {
+      "caseId": "q08",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 7266.449,
+      "issues": []
+    },
+    {
+      "caseId": "q09",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 8585.203,
+      "issues": []
+    },
+    {
+      "caseId": "q09",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6639.162,
+      "issues": []
+    },
+    {
+      "caseId": "q10",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 8428.632,
+      "issues": []
+    },
+    {
+      "caseId": "q10",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 7121.875,
+      "issues": []
+    },
+    {
+      "caseId": "q11",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7812.465,
+      "issues": []
+    },
+    {
+      "caseId": "q11",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 7320.298,
+      "issues": []
+    },
+    {
+      "caseId": "q12",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7643.918,
+      "issues": []
+    },
+    {
+      "caseId": "q12",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6796.603,
+      "issues": []
+    },
+    {
+      "caseId": "q13",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 5905.455,
+      "issues": []
+    },
+    {
+      "caseId": "q13",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 9412.874,
+      "issues": []
+    },
+    {
+      "caseId": "q14",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7309.225,
+      "issues": []
+    },
+    {
+      "caseId": "q14",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 7819.68,
+      "issues": []
+    },
+    {
+      "caseId": "q15",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7042.264,
+      "issues": []
+    },
+    {
+      "caseId": "q15",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6818.701,
+      "issues": []
+    },
+    {
+      "caseId": "q16",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7230.567,
+      "issues": []
+    },
+    {
+      "caseId": "q16",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 9952.235,
+      "issues": []
+    },
+    {
+      "caseId": "q17",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7204.833,
+      "issues": []
+    },
+    {
+      "caseId": "q17",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 8394.33,
+      "issues": []
+    },
+    {
+      "caseId": "q18",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 8085.41,
+      "issues": []
+    },
+    {
+      "caseId": "q18",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 7314.257,
+      "issues": []
+    },
+    {
+      "caseId": "q19",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7289.035,
+      "issues": []
+    },
+    {
+      "caseId": "q19",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6830.624,
+      "issues": []
+    },
+    {
+      "caseId": "q20",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 8942.401,
+      "issues": []
+    },
+    {
+      "caseId": "q20",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 9631.731,
+      "issues": []
+    },
+    {
+      "caseId": "q21",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 9121.14,
+      "issues": []
+    },
+    {
+      "caseId": "q21",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 7145.324,
+      "issues": []
+    },
+    {
+      "caseId": "q22",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7588.893,
+      "issues": []
+    },
+    {
+      "caseId": "q22",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 6903.376,
+      "issues": []
+    },
+    {
+      "caseId": "q23",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 8235.046,
+      "issues": []
+    },
+    {
+      "caseId": "q23",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 7869.298,
+      "issues": []
+    },
+    {
+      "caseId": "q24",
+      "arm": "with",
+      "valid": true,
+      "elapsedMs": 7219.873,
+      "issues": []
+    },
+    {
+      "caseId": "q24",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 7257.424,
+      "issues": []
+    }
+  ],
+  "replayRunSha256": "06cd8fa57208f60500b83697567c41f9f2b5362a19aaa7f66be7eeb127ae485b",
+  "completedAt": "2026-11-02T12:02:04.586331+00:00",
+  "pendingCallsStopped": false
+}

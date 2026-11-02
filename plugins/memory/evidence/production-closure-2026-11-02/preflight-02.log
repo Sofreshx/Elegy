@@ -1,0 +1,2 @@
+{"caseId": "preflight", "arm": "without", "valid": true, "elapsedMs": 7069.567}
+{"stage": "preflight", "status": "completed", "ready": true, "exitCode": 0, "elapsedMs": 7069.567}

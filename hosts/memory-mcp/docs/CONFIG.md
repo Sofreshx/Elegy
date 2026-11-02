@@ -108,6 +108,42 @@ memories. Keep the database snapshot private and preserve existing evidence.
 The plan must contain no credentials; only listed Memory environment settings
 are accepted. These helpers do not configure other agent hosts implicitly.
 
+Start from the disabled
+[`shared-install-plan.example.json`](shared-install-plan.example.json).
+Its placeholder revision and hashes deliberately fail validation. Keep the
+filled plan private: replace every example path, bind the exact committed
+source and both executable hashes, and use the same revision in the install
+directory and command. The backup name uses its first seven hex characters.
+This helper supports the shown Windows layout: Codex `config.toml`, its sibling
+`bin/elegy-memory/REVISION` directory, and the home-level `.elegy/memory.db`.
+It updates an existing Memory binding, not a first-time Codex installation.
+The profile is an inactive, pinned local file; validating it does not open a
+tunnel or require a runtime key. The fixture suite shows complete fictional
+plan construction without reading a user's configuration.
+
+`expectedCurrentMemoryEntrySha256` hashes only the original Memory entry with
+Python's `json.dumps(entry, sort_keys=True).encode()` followed by SHA-256.
+Compute it locally from `tomllib.loads(config_text)["mcp_servers"]["elegy-memory"]`;
+do not share the full Codex configuration or place credentials in the plan.
+For artifact/profile/plan hashes, use SHA-256 of their exact file bytes. Review
+the filled plan and its hash together before invoking the installer:
+
+```text
+python scripts/install-shared-memory.py --plan ABSOLUTE_PRIVATE_PLAN --plan-sha256 REVIEWED_PLAN_SHA256
+```
+
+This command is dry-run only. After closing all configuration writers, the
+same reviewed arguments plus `--apply-approved` perform the backed-up update;
+`--rollback-config-approved` restores its original Memory binding. Neither
+mode starts MCP or the tunnel. The general source build is:
+
+```text
+cargo build --release --locked -p elegy-memory -p elegy-memory-mcp --bin elegy-memory --bin elegy-memory-mcp-stdio
+```
+
+Build from a clean committed checkout and record the source revision and
+executable hashes. The shared package version alone does not identify a build.
+
 The installer requires Python 3.12 or newer. Its private receipt binds the exact
 reviewed plan hash to `prepared`, `snapshot-ready`, `configured` and `rolled-back`
 phases. Repeating the same approved command resumes an interrupted apply or

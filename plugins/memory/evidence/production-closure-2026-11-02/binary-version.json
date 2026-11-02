@@ -1,0 +1,8 @@
+{
+  "exitCode": 2,
+  "stdout": "",
+  "stderr": "error: unexpected argument '--version' found\n\nUsage: elegy-memory.exe [OPTIONS] <COMMAND>\n\nFor more information, try '--help'.",
+  "declaredPackageVersion": "0.1.0",
+  "versionSource": "workspace.package.version in bound committed source",
+  "cliVersionFlagSupported": false
+}
